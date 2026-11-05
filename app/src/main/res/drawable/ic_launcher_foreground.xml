@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Arch Linux Iconic Arch Silhouette (Arch Cyan) -->
+    <path
+        android:fillColor="#1793D1"
+        android:pathData="M54,22 C51,22 49,25 47,30 L23,80 C27,81 31,81 35,80 C39,73 45,69 51,69 C53,69 55,70 57,71 C55,67 52,64 47,63 C49,60 52,57 54,52 C56,57 59,60 61,63 C58,64 56,66 54,69 C58,69 64,72 68,80 C72,81 76,81 85,80 L61,30 C59,25 57,22 54,22 Z" />
+
+    <!-- Terminal Prompt Chevron (Pure White) -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M48,54 L57,61 L48,68" />
+
+    <!-- Terminal Cursor (Pure White) -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M63,68 L71,68" />
+
+</vector>
