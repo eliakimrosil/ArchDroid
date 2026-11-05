@@ -197,6 +197,11 @@ object BootstrapManager {
             } catch (_: Throwable) {
                 agyFile.setExecutable(true, false)
             }
+            val agySymlink = File(rootfsDir, "usr/local/bin/agy")
+            if (agySymlink.exists()) agySymlink.delete()
+            try {
+                Os.symlink("/opt/agy/agy", agySymlink.absolutePath)
+            } catch (_: Throwable) {}
         }
 
         // Ensure critical directories and permissions inside rootfs
@@ -353,6 +358,37 @@ object BootstrapManager {
                             entry = tar.nextEntry
                         }
                     }
+                }
+            }
+
+            // If agy is bundled in APK but missing or incomplete in installed rootfs, extract it now
+            val agyFile = File(destDir, "opt/agy/agy")
+            if (!agyFile.exists() || agyFile.length() < 1000) {
+                val hasAgyAsset = try {
+                    "agy.gz.bin" in (context.assets.list("")?.toSet() ?: emptySet())
+                } catch (_: Throwable) {
+                    false
+                }
+                if (hasAgyAsset) {
+                    agyFile.parentFile?.mkdirs()
+                    context.assets.open("agy.gz.bin").use { rawIn ->
+                        GZIPInputStream(BufferedInputStream(rawIn, 64 * 1024)).use { gzIn ->
+                            FileOutputStream(agyFile).use { out ->
+                                val buf = ByteArray(128 * 1024)
+                                while (true) {
+                                    val r = gzIn.read(buf)
+                                    if (r <= 0) break
+                                    out.write(buf, 0, r)
+                                }
+                            }
+                        }
+                    }
+                    chmodSafe(agyFile, 493) // 0755
+                    val agySymlink = File(destDir, "usr/local/bin/agy")
+                    if (agySymlink.exists()) agySymlink.delete()
+                    try {
+                        Os.symlink("/opt/agy/agy", agySymlink.absolutePath)
+                    } catch (_: Throwable) {}
                 }
             }
 
