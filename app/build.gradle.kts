@@ -82,9 +82,6 @@ tasks.register("copyApkToDownload") {
         if (downloadDir.exists() && apkSource.exists()) {
             val destApk = File(downloadDir, "ArchDroid-debug.apk")
             apkSource.copyTo(destApk, overwrite = true)
-            // Also maintain KimSystem-debug.apk compatibility if needed
-            val ruleApk = File(downloadDir, "KimSystem-debug.apk")
-            apkSource.copyTo(ruleApk, overwrite = true)
             println("[Gradle] Automatically copied debug APK to ${destApk.absolutePath} (${destApk.length() / (1024 * 1024)} MB)")
         }
     }
