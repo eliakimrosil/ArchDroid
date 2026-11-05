@@ -86,40 +86,6 @@ object TerminalThemeManager {
             )
         ),
         TerminalThemePreset(
-            id = "github_dark",
-            name = "GitHub Dark",
-            bgHex = "#0D1117",
-            fgHex = "#C9D1D9",
-            cursorHex = "#58A6FF",
-            topBarHex = "#161B22",
-            tabActiveHex = "#238636",
-            tabInactiveHex = "#21262D",
-            extraKeysBgHex = "#161B22",
-            ansiColors = listOf(
-                "#484F58", "#FF7B72", "#3FB950", "#D29922",
-                "#58A6FF", "#BC8CFF", "#39C5CF", "#B1BAC4",
-                "#6E7681", "#FFA198", "#56D364", "#E3B341",
-                "#79C0FF", "#D2A8FF", "#56D4DD", "#F0F6FC"
-            )
-        ),
-        TerminalThemePreset(
-            id = "catppuccin_mocha",
-            name = "Catppuccin Mocha",
-            bgHex = "#1E1E2E",
-            fgHex = "#CDD6F4",
-            cursorHex = "#F5E0DC",
-            topBarHex = "#181825",
-            tabActiveHex = "#CBA6F7",
-            tabInactiveHex = "#313244",
-            extraKeysBgHex = "#181825",
-            ansiColors = listOf(
-                "#45475A", "#F38BA8", "#A6E3A1", "#F9E2AF",
-                "#89B4FA", "#F5C2E7", "#94E2D5", "#BAC2DE",
-                "#585B70", "#F38BA8", "#A6E3A1", "#F9E2AF",
-                "#89B4FA", "#F5C2E7", "#94E2D5", "#A6ADC8"
-            )
-        ),
-        TerminalThemePreset(
             id = "dracula",
             name = "Dracula",
             bgHex = "#282A36",
