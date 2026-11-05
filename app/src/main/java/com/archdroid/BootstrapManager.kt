@@ -357,6 +357,28 @@ object BootstrapManager {
             }
 
             // Write custom reboot and poweroff shims for clean in-terminal session restarts
+            val profileFile = File(destDir, "root/.profile")
+            if (profileFile.exists()) {
+                val content = profileFile.readText()
+                if (content.contains("Arch Linux") && content.contains("install-agents")) {
+                    profileFile.writeText(
+                        """
+                        [ -f /root/.bashrc ] && . /root/.bashrc
+
+                        if [ -t 0 ]; then
+                            printf "\033[1;36m       /\\         \033[1;37mArchDroid Linux (PRoot)\033[0m\n"
+                            printf "\033[1;36m      /  \\        \033[0;37mKernel: Linux 6.17.0-ArchDroid\033[0m\n"
+                            printf "\033[1;36m     /\\   \\       \033[0;37mPackage Manager: pacman 7.1\033[0m\n"
+                            printf "\033[1;36m    /      \\      \033[0;37mArchitecture: aarch64\033[0m\n"
+                            printf "\033[1;36m   /   ,,   \\     \033[0;37mC Library: GNU libc (native)\033[0m\n"
+                            printf "\033[1;36m  /   |  |  -\\    \033[0;37mType 'install-agents' for AI tools\033[0m\n"
+                            printf "\033[1;36m /_-''    ''-_\\   \033[0m\n\n"
+                        fi
+                        """.trimIndent() + "\n"
+                    )
+                }
+            }
+
             val rebootFile = File(destDir, "usr/local/bin/reboot")
             rebootFile.parentFile?.mkdirs()
             rebootFile.writeText(
