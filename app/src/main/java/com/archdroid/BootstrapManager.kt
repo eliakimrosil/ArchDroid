@@ -48,12 +48,10 @@ object BootstrapManager {
         val stamp = File(rootfs, ".bootstrap_version")
         val bash = File(rootfs, "usr/bin/bash")
         val pacman = File(rootfs, "usr/bin/pacman")
-        val agy = File(rootfs, "opt/agy/agy")
         return stamp.exists() &&
             stamp.readText().trim() == BOOTSTRAP_VERSION &&
             bash.exists() &&
-            pacman.exists() &&
-            agy.exists()
+            pacman.exists()
     }
 
     private fun openRootfsStream(context: Context): InputStream {
@@ -151,46 +149,54 @@ object BootstrapManager {
             }
         )
 
-        // 2. Extract bundled Antigravity CLI (agy.gz.bin -> /opt/agy/agy)
-        onProgress(
-            BootstrapProgress(
-                "Installing Antigravity CLI (agy)",
-                "Decompressing bundled aarch64 native binary...",
-                0.60f
+        // 2. Extract bundled Antigravity CLI if bundled in APK
+        val agyAssetExists = try {
+            "agy.gz.bin" in (context.assets.list("")?.toSet() ?: emptySet())
+        } catch (_: Throwable) {
+            false
+        }
+
+        if (agyAssetExists) {
+            onProgress(
+                BootstrapProgress(
+                    "Installing Antigravity CLI (agy)",
+                    "Decompressing bundled aarch64 native binary...",
+                    0.60f
+                )
             )
-        )
-        val agyFile = File(rootfsDir, "opt/agy/agy")
-        agyFile.parentFile?.mkdirs()
-        context.assets.open("agy.gz.bin").use { rawIn ->
-            GZIPInputStream(BufferedInputStream(rawIn, 64 * 1024)).use { gzIn ->
-                FileOutputStream(agyFile).use { out ->
-                    val buf = ByteArray(128 * 1024)
-                    var total = 0L
-                    val expectedTotal = 220_000_000L
-                    while (true) {
-                        val r = gzIn.read(buf)
-                        if (r <= 0) break
-                        out.write(buf, 0, r)
-                        total += r
-                        if (total % (8 * 1024 * 1024) < 128 * 1024) {
-                            val ratio = (total.toFloat() / expectedTotal).coerceIn(0f, 1f)
-                            val mb = total / (1024 * 1024)
-                            onProgress(
-                                BootstrapProgress(
-                                    "Installing Antigravity CLI (agy)",
-                                    "Extracted ${mb} MB...",
-                                    0.60f + ratio * 0.35f
+            val agyFile = File(rootfsDir, "opt/agy/agy")
+            agyFile.parentFile?.mkdirs()
+            context.assets.open("agy.gz.bin").use { rawIn ->
+                GZIPInputStream(BufferedInputStream(rawIn, 64 * 1024)).use { gzIn ->
+                    FileOutputStream(agyFile).use { out ->
+                        val buf = ByteArray(128 * 1024)
+                        var total = 0L
+                        val expectedTotal = 220_000_000L
+                        while (true) {
+                            val r = gzIn.read(buf)
+                            if (r <= 0) break
+                            out.write(buf, 0, r)
+                            total += r
+                            if (total % (8 * 1024 * 1024) < 128 * 1024) {
+                                val ratio = (total.toFloat() / expectedTotal).coerceIn(0f, 1f)
+                                val mb = total / (1024 * 1024)
+                                onProgress(
+                                    BootstrapProgress(
+                                        "Installing Antigravity CLI (agy)",
+                                        "Extracted ${mb} MB...",
+                                        0.60f + ratio * 0.35f
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                 }
             }
-        }
-        try {
-            Os.chmod(agyFile.absolutePath, 493) // 0755
-        } catch (_: Throwable) {
-            agyFile.setExecutable(true, false)
+            try {
+                Os.chmod(agyFile.absolutePath, 493) // 0755
+            } catch (_: Throwable) {
+                agyFile.setExecutable(true, false)
+            }
         }
 
         // Ensure critical directories and permissions inside rootfs
