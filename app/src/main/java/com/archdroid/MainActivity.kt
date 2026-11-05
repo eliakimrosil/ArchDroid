@@ -116,7 +116,6 @@ class MainActivity : ComponentActivity() {
 
     private var showThemeDialog by mutableStateOf(false)
     private var showBatteryOptDialog by mutableStateOf(false)
-    private var extraKeysExpanded by mutableStateOf(false)
     private var contextMenuTabIndex by mutableStateOf<Int?>(null)
     private var lastTabTapTime = 0L
     private var lastTabTapIndex = -1
@@ -452,8 +451,6 @@ class MainActivity : ComponentActivity() {
         currentTheme = TerminalThemeManager.loadSavedTheme(this)
         cursorStyle = TerminalThemeManager.loadCursorStyle(this)
         isUsingTouch = resources.configuration.keyboard != Configuration.KEYBOARD_QWERTY
-        extraKeysExpanded = getSharedPreferences("archdroid_prefs", Context.MODE_PRIVATE)
-            .getBoolean("extra_keys_expanded", false)
 
         try {
             val filter = IntentFilter(TerminalForegroundService.ACTION_APP_EXIT)
@@ -1275,83 +1272,34 @@ class MainActivity : ComponentActivity() {
 
             // Bottom: Extra-Keys Bar (Shown when touch keys active or when no physical keyboard)
             if (extraKeysVisible) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(currentTheme.extraKeysBgColor)
+                        .padding(horizontal = 6.dp, vertical = 5.dp)
+                        .horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (extraKeysExpanded) {
-                        // Row 2 (Extended Navigation, Editing & Programming Symbols)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 6.dp, vertical = 3.dp)
-                                .horizontalScroll(rememberScrollState()),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            ExtraKeyButton("HOME") { sendToCurrentSession("\u001b[H") }
-                            ExtraKeyButton("END") { sendToCurrentSession("\u001b[F") }
-                            ExtraKeyButton("PGUP") { sendToCurrentSession("\u001b[5~") }
-                            ExtraKeyButton("PGDN") { sendToCurrentSession("\u001b[6~") }
-                            ExtraKeyButton("DEL") { sendToCurrentSession("\u001b[3~") }
-                            ExtraKeyButton("^Z") { sendToCurrentSession("\u001a") }
-                            ExtraKeyButton("{") { sendToCurrentSession("{") }
-                            ExtraKeyButton("}") { sendToCurrentSession("}") }
-                            ExtraKeyButton("[") { sendToCurrentSession("[") }
-                            ExtraKeyButton("]") { sendToCurrentSession("]") }
-                            ExtraKeyButton("(") { sendToCurrentSession("(") }
-                            ExtraKeyButton(")") { sendToCurrentSession(")") }
-                            ExtraKeyButton("\\") { sendToCurrentSession("\\") }
-                            ExtraKeyButton(";") { sendToCurrentSession(";") }
-                            ExtraKeyButton(":") { sendToCurrentSession(":") }
-                            ExtraKeyButton("\"") { sendToCurrentSession("\"") }
-                            ExtraKeyButton("'") { sendToCurrentSession("'") }
-                            ExtraKeyButton("`") { sendToCurrentSession("`") }
-                            ExtraKeyButton("=") { sendToCurrentSession("=") }
-                            ExtraKeyButton("_") { sendToCurrentSession("_") }
-                            ExtraKeyButton("$") { sendToCurrentSession("$") }
-                        }
-                    }
-
-                    // Row 1 (Primary Modifier & Navigation Keys + Expand Toggle)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 6.dp, vertical = 4.dp)
-                            .horizontalScroll(rememberScrollState()),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ExtraKeyButton(
-                            label = if (extraKeysExpanded) "▲" else "▼",
-                            active = extraKeysExpanded
-                        ) {
-                            extraKeysExpanded = !extraKeysExpanded
-                            getSharedPreferences("archdroid_prefs", Context.MODE_PRIVATE)
-                                .edit()
-                                .putBoolean("extra_keys_expanded", extraKeysExpanded)
-                                .apply()
-                        }
-                        ExtraKeyButton("ESC") { sendToCurrentSession("\u001b") }
-                        ExtraKeyButton("TAB") { sendToCurrentSession("\t") }
-                        ExtraKeyButton(
-                            label = "CTRL",
-                            active = ctrlLatched
-                        ) { ctrlLatched = !ctrlLatched }
-                        ExtraKeyButton(
-                            label = "ALT",
-                            active = altLatched
-                        ) { altLatched = !altLatched }
-                        ExtraKeyButton("↑") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_UP) }
-                        ExtraKeyButton("↓") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_DOWN) }
-                        ExtraKeyButton("←") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT) }
-                        ExtraKeyButton("→") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT) }
-                        ExtraKeyButton("^C") { sendToCurrentSession("\u0003") }
-                        ExtraKeyButton("-") { sendToCurrentSession("-") }
-                        ExtraKeyButton("/") { sendToCurrentSession("/") }
-                        ExtraKeyButton("|") { sendToCurrentSession("|") }
-                        ExtraKeyButton("~") { sendToCurrentSession("~") }
-                        ExtraKeyButton("PASTE") { pasteFromClipboard() }
-                    }
+                    ExtraKeyButton("ESC") { sendToCurrentSession("\u001b") }
+                    ExtraKeyButton("TAB") { sendToCurrentSession("\t") }
+                    ExtraKeyButton(
+                        label = "CTRL",
+                        active = ctrlLatched
+                    ) { ctrlLatched = !ctrlLatched }
+                    ExtraKeyButton(
+                        label = "ALT",
+                        active = altLatched
+                    ) { altLatched = !altLatched }
+                    ExtraKeyButton("↑") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_UP) }
+                    ExtraKeyButton("↓") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_DOWN) }
+                    ExtraKeyButton("←") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT) }
+                    ExtraKeyButton("→") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT) }
+                    ExtraKeyButton("^C") { sendToCurrentSession("\u0003") }
+                    ExtraKeyButton("-") { sendToCurrentSession("-") }
+                    ExtraKeyButton("/") { sendToCurrentSession("/") }
+                    ExtraKeyButton("|") { sendToCurrentSession("|") }
+                    ExtraKeyButton("~") { sendToCurrentSession("~") }
+                    ExtraKeyButton("PASTE") { pasteFromClipboard() }
                 }
             }
         }
