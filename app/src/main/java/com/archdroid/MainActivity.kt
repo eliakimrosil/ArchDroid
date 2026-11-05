@@ -29,6 +29,8 @@ import android.view.inputmethod.InputMethodManager
 import kotlin.math.roundToInt
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -43,10 +45,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.SettingsBackupRestore
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -77,6 +83,11 @@ import com.termux.view.TerminalViewClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileInputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
 
@@ -116,6 +127,16 @@ class MainActivity : ComponentActivity() {
 
     private var showThemeDialog by mutableStateOf(false)
     private var showBatteryOptDialog by mutableStateOf(false)
+    private var showBackupDialog by mutableStateOf(false)
+    private var backupOpInProgress by mutableStateOf(false)
+    private var backupOpStatus by mutableStateOf<String?>(null)
+    private var backupOpDetail by mutableStateOf<String?>(null)
+    private var backupOpProgress by mutableFloatStateOf(0f)
+    private var lastCreatedBackupFile by mutableStateOf<File?>(null)
+    private var restoreTargetFile by mutableStateOf<File?>(null)
+    private var restoreTargetUri by mutableStateOf<Uri?>(null)
+    private var showRestoreConfirmDialog by mutableStateOf(false)
+    private lateinit var restorePickerLauncher: ActivityResultLauncher<Array<String>>
     private var contextMenuTabIndex by mutableStateOf<Int?>(null)
     private var lastTabTapTime = 0L
     private var lastTabTapIndex = -1
@@ -155,6 +176,80 @@ class MainActivity : ComponentActivity() {
                 if (pm != null && !pm.isIgnoringBatteryOptimizations(packageName)) {
                     showBatteryOptDialog = true
                 }
+            }
+        }
+    }
+
+    private fun executeCreateBackup() {
+        if (backupOpInProgress) return
+        backupOpInProgress = true
+        backupOpStatus = "Preparing Backup"
+        backupOpDetail = "Scanning filesystem..."
+        backupOpProgress = 0.05f
+        lifecycleScope.launch {
+            val result = BackupManager.createFullBackup(this@MainActivity) { progress ->
+                backupOpStatus = progress.stage
+                backupOpDetail = progress.detail
+                backupOpProgress = progress.progress
+            }
+            backupOpInProgress = false
+            result.onSuccess { file ->
+                lastCreatedBackupFile = file
+                backupOpStatus = "Backup Created Successfully"
+                backupOpDetail = "Saved to: ${file.name} (${file.length() / (1024 * 1024)} MB)"
+            }.onFailure { err ->
+                backupOpStatus = "Backup Failed"
+                backupOpDetail = err.message ?: "Unknown error"
+            }
+        }
+    }
+
+    private fun executeRestore(file: File?, uri: Uri?) {
+        if (backupOpInProgress) return
+        backupOpInProgress = true
+        backupOpStatus = "Restoring Snapshot"
+        backupOpDetail = "Closing active sessions..."
+        backupOpProgress = 0.05f
+        lifecycleScope.launch {
+            try {
+                TerminalSessionHolder.terminateAllSessions()
+                delay(300)
+                val stream = file?.let { FileInputStream(it) }
+                    ?: uri?.let { contentResolver.openInputStream(it) }
+                    ?: throw IllegalArgumentException("No input source for restore")
+
+                val result = BackupManager.restoreFullBackup(this@MainActivity, stream) { progress ->
+                    backupOpStatus = progress.stage
+                    backupOpDetail = progress.detail
+                    backupOpProgress = progress.progress
+                }
+
+                result.onSuccess {
+                    backupOpStatus = "Restore Complete"
+                    backupOpDetail = "Re-launching terminal..."
+                    currentTheme = TerminalThemeManager.loadSavedTheme(this@MainActivity)
+                    fontSizePx = TerminalThemeManager.loadFontSize(this@MainActivity, 34)
+                    cursorStyle = TerminalThemeManager.loadCursorStyle(this@MainActivity)
+
+                    val first = TerminalSessionHolder.createNewSession(
+                        this@MainActivity,
+                        sessionClient
+                    )
+                    terminalViewRef?.attachSession(first)
+                    applyCursorStyle(cursorStyle)
+                    isReady = true
+                    showRestoreConfirmDialog = false
+                    showBackupDialog = false
+                    backupOpInProgress = false
+                }.onFailure { err ->
+                    backupOpInProgress = false
+                    backupOpStatus = "Restore Failed"
+                    backupOpDetail = err.message ?: "Unknown error"
+                }
+            } catch (e: Throwable) {
+                backupOpInProgress = false
+                backupOpStatus = "Restore Failed"
+                backupOpDetail = e.message ?: "Unknown error"
             }
         }
     }
@@ -447,6 +542,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        restorePickerLauncher = registerForActivityResult(
+            ActivityResultContracts.OpenDocument()
+        ) { uri ->
+            if (uri != null) {
+                restoreTargetUri = uri
+                restoreTargetFile = null
+                showRestoreConfirmDialog = true
+            }
+        }
         fontSizePx = TerminalThemeManager.loadFontSize(this, 34)
         currentTheme = TerminalThemeManager.loadSavedTheme(this)
         cursorStyle = TerminalThemeManager.loadCursorStyle(this)
@@ -488,6 +592,10 @@ class MainActivity : ComponentActivity() {
                         )
                     } else {
                         TerminalWorkspace()
+                    }
+
+                    if (showRestoreConfirmDialog) {
+                        RestoreConfirmationDialog()
                     }
                 }
             }
@@ -784,6 +892,24 @@ class MainActivity : ComponentActivity() {
                     overflow = TextOverflow.Ellipsis,
                     fontFamily = FontFamily.Monospace
                 )
+
+                Spacer(modifier = Modifier.height(26.dp))
+                OutlinedButton(
+                    onClick = {
+                        try {
+                            restorePickerLauncher.launch(arrayOf("*/*"))
+                        } catch (_: Throwable) {}
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF58A6FF))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SettingsBackupRestore,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Import Backup Snapshot Instead", fontSize = 12.sp)
+                }
             }
         }
     }
@@ -1002,6 +1128,25 @@ class MainActivity : ComponentActivity() {
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
+
+                // Backup & Restore Button (Pinned to the right, next to Theme)
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(currentTheme.tabInactiveColor)
+                        .clickable { showBackupDialog = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Backup,
+                        contentDescription = "Backup & Restore",
+                        tint = currentTheme.fgColor,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
 
                 // Theme & Aesthetics Palette Button (Pinned to the right)
                 Box(
@@ -1672,6 +1817,325 @@ class MainActivity : ComponentActivity() {
                 }
             )
         }
+
+        // Full System Backup & Restore Dialog (Mode B)
+        if (showBackupDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    if (!backupOpInProgress) showBackupDialog = false
+                },
+                containerColor = currentTheme.topBarColor,
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Backup,
+                            contentDescription = null,
+                            tint = Color(0xFF1793D1),
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Backup & Restore (Mode B)",
+                            color = currentTheme.fgColor,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                    }
+                },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = "Full Environment Snapshot",
+                            color = Color(0xFF1793D1),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Backs up the entire Arch Linux rootfs, all installed packages (Python, Node, npm), AI agents (agy, claude, codex, hermes), SSH keys, git configs, shell history, and app preferences into a portable .tar.gz archive.",
+                            color = currentTheme.fgColor.copy(alpha = 0.8f),
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Operation progress or status
+                        if (backupOpInProgress) {
+                            LinearProgressIndicator(
+                                progress = { backupOpProgress.coerceIn(0f, 1f) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp)),
+                                color = Color(0xFF1793D1)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = backupOpStatus ?: "Processing...",
+                                color = currentTheme.fgColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                text = backupOpDetail ?: "",
+                                color = currentTheme.fgColor.copy(alpha = 0.7f),
+                                fontSize = 11.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                        } else if (backupOpStatus != null) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                    .padding(10.dp)
+                            ) {
+                                Column {
+                                    Text(
+                                        text = backupOpStatus!!,
+                                        color = if (backupOpStatus!!.contains("Success") || backupOpStatus!!.contains("Complete")) Color(0xFF7EE787) else Color(0xFFFF7B72),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                    if (backupOpDetail != null) {
+                                        Text(
+                                            text = backupOpDetail!!,
+                                            color = currentTheme.fgColor.copy(alpha = 0.8f),
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    if (lastCreatedBackupFile != null && lastCreatedBackupFile!!.exists()) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Button(
+                                            onClick = {
+                                                try {
+                                                    val shareIntent = BackupManager.createShareIntent(this@MainActivity, lastCreatedBackupFile!!)
+                                                    startActivity(Intent.createChooser(shareIntent, "Share ArchDroid Snapshot"))
+                                                } catch (_: Throwable) {}
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Share,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(15.dp),
+                                                tint = Color.White
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Share Snapshot", color = Color.White, fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                        }
+
+                        // Export Button
+                        Button(
+                            onClick = { executeCreateBackup() },
+                            enabled = !backupOpInProgress,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Backup,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Create Full Backup Now", color = Color.White, fontSize = 13.sp)
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        HorizontalDivider(color = currentTheme.fgColor.copy(alpha = 0.15f))
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Restore Section
+                        Text(
+                            text = "Restore Snapshot",
+                            color = Color(0xFF1793D1),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        val localBackups = remember(showBackupDialog) { BackupManager.listLocalBackups() }
+                        if (localBackups.isNotEmpty()) {
+                            Text(
+                                text = "Found ${localBackups.size} backup(s) in /sdcard/Download:",
+                                color = currentTheme.fgColor.copy(alpha = 0.7f),
+                                fontSize = 11.sp
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            localBackups.take(3).forEach { backupFile ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 3.dp)
+                                        .background(currentTheme.tabInactiveColor, RoundedCornerShape(6.dp))
+                                        .clickable(enabled = !backupOpInProgress) {
+                                            restoreTargetFile = backupFile
+                                            restoreTargetUri = null
+                                            showRestoreConfirmDialog = true
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = backupFile.name,
+                                            color = currentTheme.fgColor,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Text(
+                                            text = "${backupFile.length() / (1024 * 1024)} MB • ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date(backupFile.lastModified()))}",
+                                            color = currentTheme.fgColor.copy(alpha = 0.6f),
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                    Text(
+                                        text = "Restore",
+                                        color = Color(0xFF1793D1),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                try {
+                                    restorePickerLauncher.launch(arrayOf("*/*"))
+                                } catch (_: Throwable) {}
+                            },
+                            enabled = !backupOpInProgress,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FolderOpen,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Browse & Import Snapshot File...", fontSize = 12.sp)
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { showBackupDialog = false },
+                        enabled = !backupOpInProgress,
+                        colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabActiveColor)
+                    ) {
+                        Text("Close", color = Color.White)
+                    }
+                }
+            )
+        }
+    }
+
+    @Composable
+    private fun RestoreConfirmationDialog() {
+        val displayName = restoreTargetFile?.name
+            ?: restoreTargetUri?.lastPathSegment
+            ?: "selected backup archive"
+
+        AlertDialog(
+            onDismissRequest = {
+                if (!backupOpInProgress) showRestoreConfirmDialog = false
+            },
+            containerColor = currentTheme.topBarColor,
+            title = {
+                Text(
+                    text = "Confirm Full System Restore",
+                    color = Color(0xFFFF7B72),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+            },
+            text = {
+                Column {
+                    if (backupOpInProgress) {
+                        LinearProgressIndicator(
+                            progress = { backupOpProgress.coerceIn(0f, 1f) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = Color(0xFF1793D1)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = backupOpStatus ?: "Restoring snapshot...",
+                            color = currentTheme.fgColor,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            text = backupOpDetail ?: "",
+                            color = currentTheme.fgColor.copy(alpha = 0.7f),
+                            fontSize = 11.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    } else {
+                        Text(
+                            text = "Are you sure you want to restore:",
+                            color = currentTheme.fgColor.copy(alpha = 0.85f),
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = displayName,
+                            color = currentTheme.fgColor,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "⚠ WARNING: This will overwrite files in your Arch Linux rootfs with the snapshot and restart all active sessions.",
+                            color = Color(0xFFFF7B72),
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                if (!backupOpInProgress) {
+                    Button(
+                        onClick = {
+                            executeRestore(restoreTargetFile, restoreTargetUri)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633))
+                    ) {
+                        Text("Proceed & Restore", color = Color.White)
+                    }
+                }
+            },
+            dismissButton = {
+                if (!backupOpInProgress) {
+                    TextButton(onClick = { showRestoreConfirmDialog = false }) {
+                        Text("Cancel", color = currentTheme.fgColor.copy(alpha = 0.7f))
+                    }
+                }
+            }
+        )
     }
 
     @Composable

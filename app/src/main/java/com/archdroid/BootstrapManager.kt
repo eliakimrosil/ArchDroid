@@ -446,6 +446,87 @@ object BootstrapManager {
             )
             chmodSafe(shutdownFile, 493)
 
+            val backupScript = File(destDir, "usr/local/bin/archdroid-backup")
+            backupScript.writeText(
+                """
+                #!/bin/bash
+                set -e
+                BACKUP_DIR="/sdcard/Download"
+                mkdir -p "%S%BACKUP_DIR" 2>/dev/null || true
+                TIMESTAMP=%S%(date +%Y%m%d_%H%M%S)
+                OUT_FILE="%S%BACKUP_DIR/ArchDroid-FullBackup-%S%TIMESTAMP.tar.gz"
+
+                echo "=== ArchDroid Full System Snapshot (Mode B) ==="
+                echo "Destination: %S%OUT_FILE"
+                echo "Compressing full rootfs (this may take 20-40 seconds)..."
+
+                cd /
+                tar -czf "%S%OUT_FILE" \
+                    --exclude='tmp/*' \
+                    --exclude='proc/*' \
+                    --exclude='sys/*' \
+                    --exclude='dev/*' \
+                    --exclude='sdcard/*' \
+                    --exclude='storage/*' \
+                    --exclude='var/cache/pacman/pkg/*' \
+                    --exclude='run/*' \
+                    --exclude='var/run/*' \
+                    --exclude='var/lock/*' \
+                    --exclude='*.sock' \
+                    --exclude='*.pid' \
+                    --exclude='.bootstrap_lock' \
+                    bin boot etc home lib lib64 opt root sbin usr var 2>/dev/null || true
+
+                if [ -f "%S%OUT_FILE" ]; then
+                    SIZE=%S%(du -h "%S%OUT_FILE" | cut -f1)
+                    echo ""
+                    echo "✓ Snapshot successfully created!"
+                    echo "  File: %S%OUT_FILE"
+                    echo "  Size: %S%SIZE"
+                    echo "You can import this archive on your other devices anytime."
+                else
+                    echo "✗ Backup failed to create %S%OUT_FILE"
+                    exit 1
+                fi
+                """.trimIndent().replace("%S%", "$") + "\n"
+            )
+            chmodSafe(backupScript, 493)
+
+            val restoreScript = File(destDir, "usr/local/bin/archdroid-restore")
+            restoreScript.writeText(
+                """
+                #!/bin/bash
+                set -e
+                echo "=== ArchDroid Full System Restore ==="
+                if [ -z "%S%1" ]; then
+                    echo "Usage: archdroid-restore <path-to-backup.tar.gz>"
+                    echo "Example: archdroid-restore /sdcard/Download/ArchDroid-FullBackup-YYYYMMDD_HHmmss.tar.gz"
+                    echo ""
+                    echo "Available backups in /sdcard/Download:"
+                    ls -lh /sdcard/Download/ArchDroid-*.tar.gz 2>/dev/null || echo "  (None found)"
+                    exit 1
+                fi
+                ARCHIVE="%S%1"
+                if [ ! -f "%S%ARCHIVE" ]; then
+                    echo "Error: File not found: %S%ARCHIVE"
+                    exit 1
+                fi
+                echo "Warning: Restoring will overwrite existing system files."
+                read -p "Do you want to proceed? (y/N): " -r CONFIRM
+                if [[ ! "%S%CONFIRM" =~ ^[Yy]%S% ]]; then
+                    echo "Restore cancelled."
+                    exit 0
+                fi
+                echo "Unpacking snapshot from %S%ARCHIVE ..."
+                cd /
+                tar -xzkf "%S%ARCHIVE" -C / 2>/dev/null || tar -xzf "%S%ARCHIVE" -C /
+                echo ""
+                echo "✓ Snapshot restored successfully!"
+                echo "Please reboot session (type 'reboot') or restart the app."
+                """.trimIndent().replace("%S%", "$") + "\n"
+            )
+            chmodSafe(restoreScript, 493)
+
             // Ensure executable permissions on all critical binaries across reboots
             listOf(
                 "bin/sh",
@@ -457,7 +538,9 @@ object BootstrapManager {
                 "usr/local/bin/install-agents",
                 "usr/local/bin/reboot",
                 "usr/local/bin/poweroff",
-                "usr/local/bin/shutdown"
+                "usr/local/bin/shutdown",
+                "usr/local/bin/archdroid-backup",
+                "usr/local/bin/archdroid-restore"
             ).forEach { relPath ->
                 val f = File(destDir, relPath)
                 if (f.exists()) {
