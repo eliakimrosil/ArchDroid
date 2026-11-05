@@ -27,6 +27,7 @@ import android.view.PointerIcon
 import android.view.ScaleGestureDetector
 import android.view.inputmethod.InputMethodManager
 import kotlin.math.roundToInt
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
@@ -46,13 +47,22 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsBackupRestore
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -125,9 +135,15 @@ class MainActivity : ComponentActivity() {
     private var renameTargetIndex by mutableIntStateOf(0)
     private var renameInputText by mutableStateOf("")
 
-    private var showThemeDialog by mutableStateOf(false)
+    private var showSettingsDialog by mutableStateOf(false)
+    private var selectedSettingsTab by mutableIntStateOf(0)
+    private var keepScreenOn by mutableStateOf(false)
+    private var bellHapticEnabled by mutableStateOf(true)
+    private var rootfsDiskUsageMb by mutableLongStateOf(0L)
+    private var lastCleanedMb by mutableLongStateOf(-1L)
+    private var showResetConfirmDialog by mutableStateOf(false)
+
     private var showBatteryOptDialog by mutableStateOf(false)
-    private var showBackupDialog by mutableStateOf(false)
     private var backupOpInProgress by mutableStateOf(false)
     private var backupOpStatus by mutableStateOf<String?>(null)
     private var backupOpDetail by mutableStateOf<String?>(null)
@@ -142,6 +158,7 @@ class MainActivity : ComponentActivity() {
     private var lastTabTapIndex = -1
 
     private fun triggerBellFeedback() {
+        if (!bellHapticEnabled) return
         try {
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
@@ -239,7 +256,7 @@ class MainActivity : ComponentActivity() {
                     applyCursorStyle(cursorStyle)
                     isReady = true
                     showRestoreConfirmDialog = false
-                    showBackupDialog = false
+                    showSettingsDialog = false
                     backupOpInProgress = false
                 }.onFailure { err ->
                     backupOpInProgress = false
@@ -251,6 +268,91 @@ class MainActivity : ComponentActivity() {
                 backupOpStatus = "Restore Failed"
                 backupOpDetail = e.message ?: "Unknown error"
             }
+        }
+    }
+
+    private fun toggleKeepScreenOn(enable: Boolean) {
+        keepScreenOn = enable
+        getSharedPreferences("archdroid_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("keep_screen_on", enable)
+            .apply()
+        if (enable) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
+    private fun toggleBellHaptic(enable: Boolean) {
+        bellHapticEnabled = enable
+        getSharedPreferences("archdroid_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("bell_haptic_enabled", enable)
+            .apply()
+    }
+
+    private fun refreshRootfsDiskUsage() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val rootfs = BootstrapManager.getRootfsDir(this@MainActivity)
+                if (rootfs.exists()) {
+                    var total = 0L
+                    rootfs.walkTopDown().maxDepth(5).forEach { file ->
+                        try {
+                            val stat = Os.lstat(file.absolutePath)
+                            if (!OsConstants.S_ISLNK(stat.st_mode) && file.isFile) {
+                                total += file.length()
+                            }
+                        } catch (_: Throwable) {}
+                    }
+                    rootfsDiskUsageMb = total / (1024 * 1024)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    private fun cleanTemporaryCaches() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val rootfs = BootstrapManager.getRootfsDir(this@MainActivity)
+                var cleaned = 0L
+                val tmp = File(rootfs, "tmp")
+                tmp.listFiles()?.forEach { f ->
+                    try {
+                        cleaned += f.length()
+                        f.deleteRecursively()
+                    } catch (_: Throwable) {}
+                }
+                val pacmanCache = File(rootfs, "var/cache/pacman/pkg")
+                pacmanCache.listFiles()?.forEach { f ->
+                    try {
+                        cleaned += f.length()
+                        f.delete()
+                    } catch (_: Throwable) {}
+                }
+                lastCleanedMb = (cleaned / (1024 * 1024)).coerceAtLeast(1)
+                refreshRootfsDiskUsage()
+            } catch (_: Throwable) {}
+        }
+    }
+
+    private fun executeFactoryReset() {
+        TerminalSessionHolder.terminateAllSessions()
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val rootfs = BootstrapManager.getRootfsDir(this@MainActivity)
+                if (rootfs.exists()) {
+                    BootstrapManager.makeTreeWritable(rootfs)
+                    rootfs.deleteRecursively()
+                }
+                launch(Dispatchers.Main) {
+                    isReady = false
+                    showResetConfirmDialog = false
+                    showSettingsDialog = false
+                    startBootstrap()
+                }
+            } catch (_: Throwable) {}
         }
     }
 
@@ -555,6 +657,13 @@ class MainActivity : ComponentActivity() {
         currentTheme = TerminalThemeManager.loadSavedTheme(this)
         cursorStyle = TerminalThemeManager.loadCursorStyle(this)
         isUsingTouch = resources.configuration.keyboard != Configuration.KEYBOARD_QWERTY
+
+        val prefs = getSharedPreferences("archdroid_prefs", Context.MODE_PRIVATE)
+        keepScreenOn = prefs.getBoolean("keep_screen_on", false)
+        if (keepScreenOn) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        bellHapticEnabled = prefs.getBoolean("bell_haptic_enabled", true)
 
         try {
             val filter = IntentFilter(TerminalForegroundService.ACTION_APP_EXIT)
@@ -1129,39 +1238,23 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // Backup & Restore Button (Pinned to the right, next to Theme)
+                // Settings Gear Button (Option A: Cleanest single icon)
                 Box(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(RoundedCornerShape(7.dp))
                         .background(currentTheme.tabInactiveColor)
-                        .clickable { showBackupDialog = true },
+                        .clickable {
+                            refreshRootfsDiskUsage()
+                            showSettingsDialog = true
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Backup,
-                        contentDescription = "Backup & Restore",
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
                         tint = currentTheme.fgColor,
-                        modifier = Modifier.size(17.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                // Theme & Aesthetics Palette Button (Pinned to the right)
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(RoundedCornerShape(7.dp))
-                        .background(currentTheme.tabInactiveColor)
-                        .clickable { showThemeDialog = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Palette,
-                        contentDescription = "Themes & Aesthetics",
-                        tint = currentTheme.fgColor,
-                        modifier = Modifier.size(17.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
@@ -1539,216 +1632,6 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        // Themes & Aesthetics Dialog
-        if (showThemeDialog) {
-            AlertDialog(
-                onDismissRequest = { showThemeDialog = false },
-                containerColor = currentTheme.topBarColor,
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Palette,
-                            contentDescription = null,
-                            tint = currentTheme.tabActiveColor,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Themes & Aesthetics",
-                            color = currentTheme.fgColor,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
-                    }
-                },
-                text = {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 420.dp)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        Text(
-                            text = "COLOR SCHEMES",
-                            color = currentTheme.fgColor.copy(alpha = 0.6f),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        TerminalThemeManager.PRESETS.forEach { preset ->
-                            val isCurrent = currentTheme.id == preset.id
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isCurrent) currentTheme.tabActiveColor.copy(alpha = 0.22f) else preset.bgColor)
-                                    .border(
-                                        width = if (isCurrent) 1.5.dp else 1.dp,
-                                        color = if (isCurrent) currentTheme.tabActiveColor else Color.White.copy(alpha = 0.12f),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .clickable {
-                                        currentTheme = preset
-                                        TerminalThemeManager.applyTheme(
-                                            this@MainActivity,
-                                            preset,
-                                            sessions,
-                                            terminalViewRef
-                                        )
-                                    }
-                                    .padding(horizontal = 12.dp, vertical = 9.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(13.dp)
-                                            .clip(CircleShape)
-                                            .background(preset.bgColor)
-                                            .border(0.5.dp, Color.White.copy(alpha = 0.3f), CircleShape)
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .size(13.dp)
-                                            .clip(CircleShape)
-                                            .background(preset.fgColor)
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .size(13.dp)
-                                            .clip(CircleShape)
-                                            .background(preset.tabActiveColor)
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .size(13.dp)
-                                            .clip(CircleShape)
-                                            .background(preset.cursorColor)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = preset.name,
-                                    color = preset.fgColor,
-                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                                    fontSize = 13.sp,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                RadioButton(
-                                    selected = isCurrent,
-                                    onClick = {
-                                        currentTheme = preset
-                                        TerminalThemeManager.applyTheme(
-                                            this@MainActivity,
-                                            preset,
-                                            sessions,
-                                            terminalViewRef
-                                        )
-                                    },
-                                    colors = RadioButtonDefaults.colors(
-                                        selectedColor = currentTheme.tabActiveColor
-                                    )
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Text(
-                            text = "CURSOR STYLE",
-                            color = currentTheme.fgColor.copy(alpha = 0.6f),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            val cursorOptions = listOf(
-                                Pair(TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK, "█ Block"),
-                                Pair(TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE, "  Underline"),
-                                Pair(TerminalEmulator.TERMINAL_CURSOR_STYLE_BAR, "| Bar")
-                            )
-                            cursorOptions.forEach { (styleVal, label) ->
-                                val selected = cursorStyle == styleVal
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(if (selected) currentTheme.tabActiveColor else currentTheme.tabInactiveColor)
-                                        .clickable {
-                                            TerminalThemeManager.saveCursorStyle(this@MainActivity, styleVal)
-                                            applyCursorStyle(styleVal)
-                                        }
-                                        .padding(vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = label,
-                                        color = if (selected) Color.White else currentTheme.fgColor,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Text(
-                            text = "FONT SIZE (${fontSizePx} px)",
-                            color = currentTheme.fgColor.copy(alpha = 0.6f),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Button(
-                                onClick = { zoomOut() },
-                                colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor)
-                            ) {
-                                Text("- A", color = currentTheme.fgColor, fontWeight = FontWeight.Bold)
-                            }
-                            Text(
-                                text = "${fontSizePx} px",
-                                color = currentTheme.fgColor,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 14.sp
-                            )
-                            Button(
-                                onClick = { zoomIn() },
-                                colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor)
-                            ) {
-                                Text("+ A", color = currentTheme.fgColor, fontWeight = FontWeight.Bold)
-                            }
-                            TextButton(onClick = { zoomReset() }) {
-                                Text("Reset", color = currentTheme.tabActiveColor)
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = { showThemeDialog = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabActiveColor)
-                    ) {
-                        Text("Done", color = Color.White)
-                    }
-                }
-            )
-        }
-
         // OEM Battery Optimization Exemption Dialog
         if (showBatteryOptDialog) {
             AlertDialog(
@@ -1818,24 +1701,29 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        // Full System Backup & Restore Dialog (Mode B)
-        if (showBackupDialog) {
+        // Unified Settings Hub (Option A)
+        if (showSettingsDialog) {
+            val settingsTabs = listOf("Appearance", "System", "Backup", "Storage", "About")
+
             AlertDialog(
                 onDismissRequest = {
-                    if (!backupOpInProgress) showBackupDialog = false
+                    if (!backupOpInProgress) showSettingsDialog = false
                 },
                 containerColor = currentTheme.topBarColor,
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.Backup,
+                            imageVector = Icons.Default.Settings,
                             contentDescription = null,
                             tint = Color(0xFF1793D1),
                             modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Backup & Restore (Mode B)",
+                            text = "Settings",
                             color = currentTheme.fgColor,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
@@ -1846,202 +1734,759 @@ class MainActivity : ComponentActivity() {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
+                            .fillMaxHeight(0.85f)
                     ) {
-                        Text(
-                            text = "Full Environment Snapshot",
-                            color = Color(0xFF1793D1),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Backs up the entire Arch Linux rootfs, all installed packages (Python, Node, npm), AI agents (agy, claude, codex, hermes), SSH keys, git configs, shell history, and app preferences into a portable .tar.gz archive.",
-                            color = currentTheme.fgColor.copy(alpha = 0.8f),
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp
-                        )
+                        // Category Tabs (Horizontal Chips)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            settingsTabs.forEachIndexed { index, tabName ->
+                                val active = selectedSettingsTab == index
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (active) currentTheme.tabActiveColor else currentTheme.tabInactiveColor)
+                                        .clickable { selectedSettingsTab = index }
+                                        .padding(horizontal = 11.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = tabName,
+                                        color = if (active) Color.White else currentTheme.fgColor.copy(alpha = 0.8f),
+                                        fontSize = 12.sp,
+                                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
 
                         Spacer(modifier = Modifier.height(14.dp))
+                        HorizontalDivider(color = currentTheme.fgColor.copy(alpha = 0.15f))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                        // Operation progress or status
-                        if (backupOpInProgress) {
-                            LinearProgressIndicator(
-                                progress = { backupOpProgress.coerceIn(0f, 1f) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp)
-                                    .clip(RoundedCornerShape(3.dp)),
-                                color = Color(0xFF1793D1)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = backupOpStatus ?: "Processing...",
-                                color = currentTheme.fgColor,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                            Text(
-                                text = backupOpDetail ?: "",
-                                color = currentTheme.fgColor.copy(alpha = 0.7f),
-                                fontSize = 11.sp,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(14.dp))
-                        } else if (backupOpStatus != null) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
-                                    .padding(10.dp)
-                            ) {
-                                Column {
+                        // Tab Content
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            when (selectedSettingsTab) {
+                                0 -> {
+                                    // === Tab 0: Appearance ===
                                     Text(
-                                        text = backupOpStatus!!,
-                                        color = if (backupOpStatus!!.contains("Success") || backupOpStatus!!.contains("Complete")) Color(0xFF7EE787) else Color(0xFFFF7B72),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
+                                        text = "Color Scheme & Theme",
+                                        color = Color(0xFF1793D1),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
                                     )
-                                    if (backupOpDetail != null) {
-                                        Text(
-                                            text = backupOpDetail!!,
-                                            color = currentTheme.fgColor.copy(alpha = 0.8f),
-                                            fontSize = 11.sp
-                                        )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        TerminalThemeManager.PRESETS.forEach { theme ->
+                                            val isSelected = currentTheme.name == theme.name
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(if (isSelected) currentTheme.tabActiveColor.copy(alpha = 0.25f) else currentTheme.tabInactiveColor)
+                                                    .border(
+                                                        width = if (isSelected) 1.5.dp else 0.5.dp,
+                                                        color = if (isSelected) currentTheme.tabActiveColor else Color.Transparent,
+                                                        shape = RoundedCornerShape(8.dp)
+                                                    )
+                                                    .clickable {
+                                                        currentTheme = theme
+                                                        TerminalThemeManager.applyTheme(
+                                                            this@MainActivity,
+                                                            theme,
+                                                            sessions,
+                                                            terminalViewRef
+                                                        )
+                                                    }
+                                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(
+                                                    text = theme.name,
+                                                    color = currentTheme.fgColor,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                    listOf(theme.bgColor, theme.fgColor, theme.tabActiveColor, theme.cursorColor).forEach { col ->
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(12.dp)
+                                                                .clip(CircleShape)
+                                                                .background(col)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
-                                    if (lastCreatedBackupFile != null && lastCreatedBackupFile!!.exists()) {
-                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "Cursor Style",
+                                        color = Color(0xFF1793D1),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        listOf(
+                                            "Block" to TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK,
+                                            "Underline" to TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE,
+                                            "Bar" to TerminalEmulator.TERMINAL_CURSOR_STYLE_BAR
+                                        ).forEach { (label, style) ->
+                                            val isSelected = cursorStyle == style
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(if (isSelected) currentTheme.tabActiveColor else currentTheme.tabInactiveColor)
+                                                    .clickable {
+                                                        cursorStyle = style
+                                                        applyCursorStyle(style)
+                                                        TerminalThemeManager.saveCursorStyle(this@MainActivity, style)
+                                                    }
+                                                    .padding(horizontal = 14.dp, vertical = 7.dp)
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    color = if (isSelected) Color.White else currentTheme.fgColor,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "Font Size: ${fontSizePx}px",
+                                        color = Color(0xFF1793D1),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         Button(
-                                            onClick = {
-                                                try {
-                                                    val shareIntent = BackupManager.createShareIntent(this@MainActivity, lastCreatedBackupFile!!)
-                                                    startActivity(Intent.createChooser(shareIntent, "Share ArchDroid Snapshot"))
-                                                } catch (_: Throwable) {}
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
+                                            onClick = { zoomOut() },
+                                            colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor)
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Share,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(15.dp),
-                                                tint = Color.White
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Share Snapshot", color = Color.White, fontSize = 12.sp)
+                                            Text("- A", color = currentTheme.fgColor, fontWeight = FontWeight.Bold)
+                                        }
+                                        Button(
+                                            onClick = { zoomIn() },
+                                            colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor)
+                                        ) {
+                                            Text("+ A", color = currentTheme.fgColor, fontWeight = FontWeight.Bold)
+                                        }
+                                        TextButton(onClick = { zoomReset() }) {
+                                            Text("Reset", color = currentTheme.tabActiveColor)
                                         }
                                     }
                                 }
-                            }
-                            Spacer(modifier = Modifier.height(14.dp))
-                        }
+                                1 -> {
+                                    // === Tab 1: System & Background ===
+                                    Text(
+                                        text = "Background Execution & Keep-Alive",
+                                        color = Color(0xFF1793D1),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
 
-                        // Export Button
-                        Button(
-                            onClick = { executeCreateBackup() },
-                            enabled = !backupOpInProgress,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Backup,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = Color.White
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Create Full Backup Now", color = Color.White, fontSize = 13.sp)
-                        }
+                                    // Battery Optimization Card
+                                    val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                                    val isIgnoringBattery = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && pm != null) {
+                                        pm.isIgnoringBatteryOptimizations(packageName)
+                                    } else true
 
-                        Spacer(modifier = Modifier.height(16.dp))
-                        HorizontalDivider(color = currentTheme.fgColor.copy(alpha = 0.15f))
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Restore Section
-                        Text(
-                            text = "Restore Snapshot",
-                            color = Color(0xFF1793D1),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        val localBackups = remember(showBackupDialog) { BackupManager.listLocalBackups() }
-                        if (localBackups.isNotEmpty()) {
-                            Text(
-                                text = "Found ${localBackups.size} backup(s) in /sdcard/Download:",
-                                color = currentTheme.fgColor.copy(alpha = 0.7f),
-                                fontSize = 11.sp
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            localBackups.take(3).forEach { backupFile ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 3.dp)
-                                        .background(currentTheme.tabInactiveColor, RoundedCornerShape(6.dp))
-                                        .clickable(enabled = !backupOpInProgress) {
-                                            restoreTargetFile = backupFile
-                                            restoreTargetUri = null
-                                            showRestoreConfirmDialog = true
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                            .padding(12.dp)
+                                    ) {
+                                        Column {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Info,
+                                                    contentDescription = null,
+                                                    tint = if (isIgnoringBattery) Color(0xFF7EE787) else Color(0xFFFF7B72),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = if (isIgnoringBattery) "Battery Optimization: Exempted" else "Battery Optimization: Restricted",
+                                                    color = if (isIgnoringBattery) Color(0xFF7EE787) else Color(0xFFFF7B72),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = if (isIgnoringBattery)
+                                                    "ArchDroid runs in background without Android Doze killing long-running PRoot processes or AI agents."
+                                                else
+                                                    "Android may terminate background terminal jobs and LLM agents when the screen is off or app is minimized.",
+                                                color = currentTheme.fgColor.copy(alpha = 0.8f),
+                                                fontSize = 11.sp,
+                                                lineHeight = 15.sp
+                                            )
+                                            if (!isIgnoringBattery) {
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                Button(
+                                                    onClick = {
+                                                        try {
+                                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                                                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                                                    data = Uri.parse("package:$packageName")
+                                                                }
+                                                                startActivity(intent)
+                                                            }
+                                                        } catch (_: Throwable) {
+                                                            try {
+                                                                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                                            } catch (_: Throwable) {}
+                                                        }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
+                                                ) {
+                                                    Text("Disable Restriction", color = Color.White, fontSize = 11.sp)
+                                                }
+                                            }
                                         }
-                                        .padding(horizontal = 10.dp, vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    }
+
+                                    Spacer(modifier = Modifier.height(14.dp))
+
+                                    // Keep Screen On
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.WbSunny,
+                                                contentDescription = null,
+                                                tint = currentTheme.fgColor,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Keep Screen On",
+                                                    color = currentTheme.fgColor,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontSize = 13.sp
+                                                )
+                                                Text(
+                                                    text = "Prevents device sleep while terminal active",
+                                                    color = currentTheme.fgColor.copy(alpha = 0.65f),
+                                                    fontSize = 11.sp
+                                                )
+                                            }
+                                        }
+                                        Switch(
+                                            checked = keepScreenOn,
+                                            onCheckedChange = { toggleKeepScreenOn(it) }
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    // Terminal Bell Vibration
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Vibration,
+                                                contentDescription = null,
+                                                tint = currentTheme.fgColor,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Terminal Bell Haptics",
+                                                    color = currentTheme.fgColor,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontSize = 13.sp
+                                                )
+                                                Text(
+                                                    text = "Vibrate on terminal ASCII bell (\\a)",
+                                                    color = currentTheme.fgColor.copy(alpha = 0.65f),
+                                                    fontSize = 11.sp
+                                                )
+                                            }
+                                        }
+                                        Switch(
+                                            checked = bellHapticEnabled,
+                                            onCheckedChange = { toggleBellHaptic(it) }
+                                        )
+                                    }
+                                }
+                                2 -> {
+                                    // === Tab 2: Backup & Disaster Recovery ===
+                                    Text(
+                                        text = "Full Environment Snapshot (Mode B)",
+                                        color = Color(0xFF1793D1),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Backs up the entire Arch Linux container, installed packages (Python, Node, npm), AI agents (agy, claude, codex, hermes), SSH keys, dotfiles, and app settings into a portable .tar.gz archive.",
+                                        color = currentTheme.fgColor.copy(alpha = 0.8f),
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp
+                                    )
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    if (backupOpInProgress) {
+                                        LinearProgressIndicator(
+                                            progress = { backupOpProgress.coerceIn(0f, 1f) },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(6.dp)
+                                                .clip(RoundedCornerShape(3.dp)),
+                                            color = Color(0xFF1793D1)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
                                         Text(
-                                            text = backupFile.name,
+                                            text = backupOpStatus ?: "Processing...",
                                             color = currentTheme.fgColor,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                        Text(
+                                            text = backupOpDetail ?: "",
+                                            color = currentTheme.fgColor.copy(alpha = 0.7f),
                                             fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    } else if (backupOpStatus != null) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                                .padding(10.dp)
+                                        ) {
+                                            Column {
+                                                Text(
+                                                    text = backupOpStatus!!,
+                                                    color = if (backupOpStatus!!.contains("Success") || backupOpStatus!!.contains("Complete")) Color(0xFF7EE787) else Color(0xFFFF7B72),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp
+                                                )
+                                                if (backupOpDetail != null) {
+                                                    Text(
+                                                        text = backupOpDetail!!,
+                                                        color = currentTheme.fgColor.copy(alpha = 0.8f),
+                                                        fontSize = 11.sp
+                                                    )
+                                                }
+                                                if (lastCreatedBackupFile != null && lastCreatedBackupFile!!.exists()) {
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    Button(
+                                                        onClick = {
+                                                            try {
+                                                                val shareIntent = BackupManager.createShareIntent(this@MainActivity, lastCreatedBackupFile!!)
+                                                                startActivity(Intent.createChooser(shareIntent, "Share ArchDroid Snapshot"))
+                                                            } catch (_: Throwable) {}
+                                                        },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Share,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(15.dp),
+                                                            tint = Color.White
+                                                        )
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text("Share Snapshot", color = Color.White, fontSize = 12.sp)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    }
+
+                                    Button(
+                                        onClick = { executeCreateBackup() },
+                                        enabled = !backupOpInProgress,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Backup,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = Color.White
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Create Full Backup Now", color = Color.White, fontSize = 13.sp)
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "Restore Snapshot",
+                                        color = Color(0xFF1793D1),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    val localBackups = remember(showSettingsDialog) { BackupManager.listLocalBackups() }
+                                    if (localBackups.isNotEmpty()) {
+                                        Text(
+                                            text = "Recent in /sdcard/Download:",
+                                            color = currentTheme.fgColor.copy(alpha = 0.7f),
+                                            fontSize = 11.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        localBackups.take(3).forEach { backupFile ->
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 3.dp)
+                                                    .background(currentTheme.tabInactiveColor, RoundedCornerShape(6.dp))
+                                                    .clickable(enabled = !backupOpInProgress) {
+                                                        restoreTargetFile = backupFile
+                                                        restoreTargetUri = null
+                                                        showRestoreConfirmDialog = true
+                                                    }
+                                                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = backupFile.name,
+                                                        color = currentTheme.fgColor,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        fontFamily = FontFamily.Monospace
+                                                    )
+                                                    Text(
+                                                        text = "${backupFile.length() / (1024 * 1024)} MB • ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date(backupFile.lastModified()))}",
+                                                        color = currentTheme.fgColor.copy(alpha = 0.6f),
+                                                        fontSize = 10.sp
+                                                    )
+                                                }
+                                                Text(
+                                                    text = "Restore",
+                                                    color = Color(0xFF1793D1),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = {
+                                            try {
+                                                restorePickerLauncher.launch(arrayOf("*/*"))
+                                            } catch (_: Throwable) {}
+                                        },
+                                        enabled = !backupOpInProgress,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.FolderOpen,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Browse & Import Snapshot File...", fontSize = 12.sp)
+                                    }
+                                }
+                                3 -> {
+                                    // === Tab 3: Storage & Maintenance ===
+                                    Text(
+                                        text = "Rootfs Storage Usage",
+                                        color = Color(0xFF1793D1),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                            .padding(14.dp)
+                                    ) {
+                                        Column {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Storage,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFF1793D1),
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                        text = "Container Size",
+                                                        color = currentTheme.fgColor,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        fontSize = 13.sp
+                                                    )
+                                                }
+                                                Text(
+                                                    text = if (rootfsDiskUsageMb > 0) "~${rootfsDiskUsageMb} MB" else "Calculating...",
+                                                    color = Color(0xFF1793D1),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Text(
+                                                text = "Storage used by Arch Linux rootfs, binaries, python/npm libraries, and user files in /root.",
+                                                color = currentTheme.fgColor.copy(alpha = 0.7f),
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "Clean Temporary Caches",
+                                        color = Color(0xFF1793D1),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "Purges temporary PRoot sockets, fifos, /tmp/* files, and pacman download caches without touching installed software or code.",
+                                        color = currentTheme.fgColor.copy(alpha = 0.75f),
+                                        fontSize = 11.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(
+                                        onClick = { cleanTemporaryCaches() },
+                                        colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CleaningServices,
+                                            contentDescription = null,
+                                            tint = currentTheme.fgColor,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = if (lastCleanedMb >= 0) "Cleaned Caches! (Reclaimed ~${lastCleanedMb} MB)" else "Clean Temporary Caches",
+                                            color = currentTheme.fgColor,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(20.dp))
+                                    HorizontalDivider(color = currentTheme.fgColor.copy(alpha = 0.15f))
+                                    Spacer(modifier = Modifier.height(14.dp))
+
+                                    // Factory Reset
+                                    Text(
+                                        text = "Factory Reset / Re-bootstrap",
+                                        color = Color(0xFFFF7B72),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Wipes the PRoot Linux container and re-extracts the factory Arch Linux ARM image. Useful if pacman packages or runtime get corrupted.",
+                                        color = currentTheme.fgColor.copy(alpha = 0.7f),
+                                        fontSize = 11.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(
+                                        onClick = { showResetConfirmDialog = true },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Warning,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Re-bootstrap Container (Reset)", color = Color.White, fontSize = 12.sp)
+                                    }
+                                }
+                                4 -> {
+                                    // === Tab 4: About & AI Agents ===
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "ArchDroid",
+                                            color = currentTheme.fgColor,
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Bold,
                                             fontFamily = FontFamily.Monospace
                                         )
                                         Text(
-                                            text = "${backupFile.length() / (1024 * 1024)} MB • ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date(backupFile.lastModified()))}",
-                                            color = currentTheme.fgColor.copy(alpha = 0.6f),
-                                            fontSize = 10.sp
+                                            text = "Version 1.0.0 (ARM64 PRoot)",
+                                            color = Color(0xFF1793D1),
+                                            fontSize = 12.sp,
+                                            fontFamily = FontFamily.Monospace
                                         )
+                                        Spacer(modifier = Modifier.height(14.dp))
                                     }
+
                                     Text(
-                                        text = "Restore",
+                                        text = "Integrated AI Agents:",
                                         color = Color(0xFF1793D1),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
                                     )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    listOf(
+                                        "agy" to "Antigravity CLI (Google DeepMind agent)",
+                                        "claude" to "Anthropic Claude Code CLI",
+                                        "codex" to "OpenAI Codex CLI (musl static binary)",
+                                        "hermes" to "NousResearch Hermes Agent (uv python)"
+                                    ).forEach { (cmd, desc) ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 3.dp)
+                                                .background(currentTheme.tabInactiveColor, RoundedCornerShape(6.dp))
+                                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = cmd,
+                                                color = Color(0xFF7EE787),
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 12.sp
+                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Text(
+                                                text = desc,
+                                                color = currentTheme.fgColor.copy(alpha = 0.8f),
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Button(
+                                        onClick = {
+                                            try {
+                                                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/eliakimrosil/ArchDroid")))
+                                            } catch (_: Throwable) {}
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.OpenInBrowser,
+                                            contentDescription = null,
+                                            tint = currentTheme.fgColor,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Open GitHub Repository", color = currentTheme.fgColor, fontSize = 12.sp)
+                                    }
                                 }
                             }
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                try {
-                                    restorePickerLauncher.launch(arrayOf("*/*"))
-                                } catch (_: Throwable) {}
-                            },
-                            enabled = !backupOpInProgress,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FolderOpen,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Browse & Import Snapshot File...", fontSize = 12.sp)
                         }
                     }
                 },
                 confirmButton = {
                     Button(
-                        onClick = { showBackupDialog = false },
-                        enabled = !backupOpInProgress,
+                        onClick = { showSettingsDialog = false },
                         colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabActiveColor)
                     ) {
-                        Text("Close", color = Color.White)
+                        Text("Done", color = Color.White)
+                    }
+                }
+            )
+        }
+
+        // Factory Reset Confirmation Dialog
+        if (showResetConfirmDialog) {
+            AlertDialog(
+                onDismissRequest = { showResetConfirmDialog = false },
+                containerColor = currentTheme.topBarColor,
+                title = {
+                    Text(
+                        text = "Reset Linux Container?",
+                        color = Color(0xFFFF7B72),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "This will completely delete the Arch Linux container and re-extract the factory image.",
+                            color = currentTheme.fgColor.copy(alpha = 0.85f),
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "⚠ Any files stored inside the container (/root, installed pacman packages) will be erased. Your backups in /sdcard/Download will NOT be touched.",
+                            color = Color(0xFFFF7B72),
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { executeFactoryReset() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633))
+                    ) {
+                        Text("Erase & Re-bootstrap", color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showResetConfirmDialog = false }) {
+                        Text("Cancel", color = currentTheme.fgColor.copy(alpha = 0.7f))
                     }
                 }
             )
