@@ -124,7 +124,10 @@ object ProotSessionManager {
         )
     }
 
-    // Backwards-compatible alias
+    @Deprecated(
+        "Use createArchSession instead",
+        ReplaceWith("createArchSession(context, sessionClient, initialCommand)")
+    )
     fun createAlpineSession(
         context: Context,
         sessionClient: TerminalSessionClient,

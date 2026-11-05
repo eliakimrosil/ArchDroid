@@ -140,8 +140,8 @@ class TerminalForegroundService : Service() {
 
         return builder
             .setContentTitle("ArchDroid")
-            .setContentText("$countText • Arch Linux active (agy • claude • codex)")
-            .setSmallIcon(R.drawable.ic_stat_kimsystem)
+            .setContentText("$countText • Arch Linux active (agy • claude • codex • hermes)")
+            .setSmallIcon(R.drawable.ic_stat_archdroid)
             .setContentIntent(pendingOpen)
             .setOngoing(true)
             .addAction(

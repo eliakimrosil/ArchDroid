@@ -8,16 +8,25 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Configuration
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.os.SystemClock
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.provider.Settings
 import android.system.Os
 import android.system.OsConstants
+import android.view.HapticFeedbackConstants
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.PointerIcon
+import android.view.ScaleGestureDetector
 import android.view.inputmethod.InputMethodManager
+import kotlin.math.roundToInt
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
@@ -106,9 +115,50 @@ class MainActivity : ComponentActivity() {
     private var renameInputText by mutableStateOf("")
 
     private var showThemeDialog by mutableStateOf(false)
+    private var showBatteryOptDialog by mutableStateOf(false)
+    private var extraKeysExpanded by mutableStateOf(false)
     private var contextMenuTabIndex by mutableStateOf<Int?>(null)
     private var lastTabTapTime = 0L
     private var lastTabTapIndex = -1
+
+    private fun triggerBellFeedback() {
+        try {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vm?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+            if (vibrator != null && vibrator.hasVibrator()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(VibrationEffect.createOneShot(45, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(45)
+                }
+            }
+        } catch (_: Throwable) {}
+    }
+
+    private fun triggerHapticClick() {
+        try {
+            terminalViewRef?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        } catch (_: Throwable) {}
+    }
+
+    private fun checkBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val prefs = getSharedPreferences("archdroid_prefs", Context.MODE_PRIVATE)
+            val alreadyDismissed = prefs.getBoolean("battery_opt_dismissed", false)
+            if (!alreadyDismissed) {
+                val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                if (pm != null && !pm.isIgnoringBatteryOptimizations(packageName)) {
+                    showBatteryOptDialog = true
+                }
+            }
+        }
+    }
 
     private fun zoomIn() {
         fontSizePx = (fontSizePx + 2).coerceAtMost(80)
@@ -204,7 +254,9 @@ class MainActivity : ComponentActivity() {
             pasteFromClipboard()
         }
 
-        override fun onBell(session: TerminalSession) {}
+        override fun onBell(session: TerminalSession) {
+            triggerBellFeedback()
+        }
         override fun onColorsChanged(session: TerminalSession) {
             terminalViewRef?.onScreenUpdated()
             terminalViewRef?.invalidate()
@@ -223,10 +275,11 @@ class MainActivity : ComponentActivity() {
 
     private val viewClient = object : TerminalViewClient {
         override fun onScale(scale: Float): Float {
-            val newSize = (fontSizePx * scale).toInt().coerceIn(20, 72)
+            val newSize = (fontSizePx * scale).roundToInt().coerceIn(18, 80)
             if (newSize != fontSizePx) {
                 fontSizePx = newSize
                 terminalViewRef?.setTextSize(fontSizePx)
+                TerminalThemeManager.saveFontSize(this@MainActivity, fontSizePx)
             }
             return 1.0f
         }
@@ -399,6 +452,8 @@ class MainActivity : ComponentActivity() {
         currentTheme = TerminalThemeManager.loadSavedTheme(this)
         cursorStyle = TerminalThemeManager.loadCursorStyle(this)
         isUsingTouch = resources.configuration.keyboard != Configuration.KEYBOARD_QWERTY
+        extraKeysExpanded = getSharedPreferences("archdroid_prefs", Context.MODE_PRIVATE)
+            .getBoolean("extra_keys_expanded", false)
 
         try {
             val filter = IntentFilter(TerminalForegroundService.ACTION_APP_EXIT)
@@ -446,6 +501,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         startForegroundServiceSafe()
         if (isReady) {
+            checkBatteryOptimization()
             sessions.forEach { it.updateTerminalSessionClient(sessionClient) }
             val active = TerminalSessionHolder.activeSession
             if (active != null && active.isRunning) {
@@ -498,6 +554,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 isReady = true
+                checkBatteryOptimization()
             } catch (t: Throwable) {
                 errorMessage = t.stackTraceToString()
             }
@@ -967,7 +1024,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Center: Real Termux TerminalView attached to Alpine PRoot session
+            // Center: Real Termux TerminalView attached to ArchDroid PRoot session
             AndroidView(
                 modifier = Modifier
                     .weight(1f)
@@ -1009,7 +1066,30 @@ class MainActivity : ComponentActivity() {
                         var mouseClickCount = 0
                         var isMouseDragging = false
 
-                        // High-performance desktop mouse interaction:
+                        val scaleDetector = ScaleGestureDetector(ctx, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                                val factor = detector.scaleFactor
+                                if (factor > 1.01f || factor < 0.99f) {
+                                    val newSize = (fontSizePx * factor).roundToInt().coerceIn(18, 80)
+                                    if (newSize != fontSizePx) {
+                                        fontSizePx = newSize
+                                        setTextSize(fontSizePx)
+                                    }
+                                }
+                                return true
+                            }
+
+                            override fun onScaleEnd(detector: ScaleGestureDetector) {
+                                TerminalThemeManager.saveFontSize(this@MainActivity, fontSizePx)
+                            }
+                        })
+
+                        var twoFingerStartX = 0f
+                        var twoFingerStartY = 0f
+                        var twoFingerSwipeTriggered = false
+
+                        // High-performance desktop mouse interaction & Touch gestures:
+                        // Touch: Pinch-to-zoom scales font size, two-finger horizontal swipe switches tabs.
                         // Left drag = select text, double-click = word, triple-click = line, auto-copy on release.
                         // Right-click = copy if selecting, else paste. Middle-click = paste.
                         setOnTouchListener { _, event ->
@@ -1126,6 +1206,53 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 }
+                            } else {
+                                // Touch Gestures: Pinch-to-zoom & Two-finger Tab Switching
+                                scaleDetector.onTouchEvent(event)
+                                if (scaleDetector.isInProgress) {
+                                    twoFingerSwipeTriggered = true
+                                    return@setOnTouchListener true
+                                }
+
+                                when (event.actionMasked) {
+                                    MotionEvent.ACTION_POINTER_DOWN -> {
+                                        if (event.pointerCount == 2) {
+                                            twoFingerStartX = (event.getX(0) + event.getX(1)) / 2f
+                                            twoFingerStartY = (event.getY(0) + event.getY(1)) / 2f
+                                            twoFingerSwipeTriggered = false
+                                        }
+                                    }
+                                    MotionEvent.ACTION_MOVE -> {
+                                        if (event.pointerCount == 2 && !twoFingerSwipeTriggered) {
+                                            val currentMidX = (event.getX(0) + event.getX(1)) / 2f
+                                            val currentMidY = (event.getY(0) + event.getY(1)) / 2f
+                                            val dx = currentMidX - twoFingerStartX
+                                            val dy = currentMidY - twoFingerStartY
+                                            if (kotlin.math.abs(dx) > 120f && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.5f) {
+                                                twoFingerSwipeTriggered = true
+                                                if (dx > 0) {
+                                                    // Swipe Right -> previous tab
+                                                    if (currentSessionIndex > 0) {
+                                                        switchSession(currentSessionIndex - 1)
+                                                        triggerHapticClick()
+                                                    }
+                                                } else {
+                                                    // Swipe Left -> next tab
+                                                    if (currentSessionIndex < sessions.size - 1) {
+                                                        switchSession(currentSessionIndex + 1)
+                                                        triggerHapticClick()
+                                                    }
+                                                }
+                                                return@setOnTouchListener true
+                                            }
+                                        }
+                                    }
+                                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                                        if (event.pointerCount <= 2) {
+                                            twoFingerSwipeTriggered = false
+                                        }
+                                    }
+                                }
                             }
                             false
                         }
@@ -1148,34 +1275,83 @@ class MainActivity : ComponentActivity() {
 
             // Bottom: Extra-Keys Bar (Shown when touch keys active or when no physical keyboard)
             if (extraKeysVisible) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(currentTheme.extraKeysBgColor)
-                        .padding(horizontal = 6.dp, vertical = 5.dp)
-                        .horizontalScroll(rememberScrollState()),
-                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ExtraKeyButton("ESC") { sendToCurrentSession("\u001b") }
-                    ExtraKeyButton("TAB") { sendToCurrentSession("\t") }
-                    ExtraKeyButton(
-                        label = "CTRL",
-                        active = ctrlLatched
-                    ) { ctrlLatched = !ctrlLatched }
-                    ExtraKeyButton(
-                        label = "ALT",
-                        active = altLatched
-                    ) { altLatched = !altLatched }
-                    ExtraKeyButton("↑") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_UP) }
-                    ExtraKeyButton("↓") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_DOWN) }
-                    ExtraKeyButton("←") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT) }
-                    ExtraKeyButton("→") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT) }
-                    ExtraKeyButton("^C") { sendToCurrentSession("\u0003") }
-                    ExtraKeyButton("-") { sendToCurrentSession("-") }
-                    ExtraKeyButton("/") { sendToCurrentSession("/") }
-                    ExtraKeyButton("|") { sendToCurrentSession("|") }
-                    ExtraKeyButton("~") { sendToCurrentSession("~") }
-                    ExtraKeyButton("PASTE") { pasteFromClipboard() }
+                    if (extraKeysExpanded) {
+                        // Row 2 (Extended Navigation, Editing & Programming Symbols)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                                .horizontalScroll(rememberScrollState()),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ExtraKeyButton("HOME") { sendToCurrentSession("\u001b[H") }
+                            ExtraKeyButton("END") { sendToCurrentSession("\u001b[F") }
+                            ExtraKeyButton("PGUP") { sendToCurrentSession("\u001b[5~") }
+                            ExtraKeyButton("PGDN") { sendToCurrentSession("\u001b[6~") }
+                            ExtraKeyButton("DEL") { sendToCurrentSession("\u001b[3~") }
+                            ExtraKeyButton("^Z") { sendToCurrentSession("\u001a") }
+                            ExtraKeyButton("{") { sendToCurrentSession("{") }
+                            ExtraKeyButton("}") { sendToCurrentSession("}") }
+                            ExtraKeyButton("[") { sendToCurrentSession("[") }
+                            ExtraKeyButton("]") { sendToCurrentSession("]") }
+                            ExtraKeyButton("(") { sendToCurrentSession("(") }
+                            ExtraKeyButton(")") { sendToCurrentSession(")") }
+                            ExtraKeyButton("\\") { sendToCurrentSession("\\") }
+                            ExtraKeyButton(";") { sendToCurrentSession(";") }
+                            ExtraKeyButton(":") { sendToCurrentSession(":") }
+                            ExtraKeyButton("\"") { sendToCurrentSession("\"") }
+                            ExtraKeyButton("'") { sendToCurrentSession("'") }
+                            ExtraKeyButton("`") { sendToCurrentSession("`") }
+                            ExtraKeyButton("=") { sendToCurrentSession("=") }
+                            ExtraKeyButton("_") { sendToCurrentSession("_") }
+                            ExtraKeyButton("$") { sendToCurrentSession("$") }
+                        }
+                    }
+
+                    // Row 1 (Primary Modifier & Navigation Keys + Expand Toggle)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                            .horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ExtraKeyButton(
+                            label = if (extraKeysExpanded) "▲" else "▼",
+                            active = extraKeysExpanded
+                        ) {
+                            extraKeysExpanded = !extraKeysExpanded
+                            getSharedPreferences("archdroid_prefs", Context.MODE_PRIVATE)
+                                .edit()
+                                .putBoolean("extra_keys_expanded", extraKeysExpanded)
+                                .apply()
+                        }
+                        ExtraKeyButton("ESC") { sendToCurrentSession("\u001b") }
+                        ExtraKeyButton("TAB") { sendToCurrentSession("\t") }
+                        ExtraKeyButton(
+                            label = "CTRL",
+                            active = ctrlLatched
+                        ) { ctrlLatched = !ctrlLatched }
+                        ExtraKeyButton(
+                            label = "ALT",
+                            active = altLatched
+                        ) { altLatched = !altLatched }
+                        ExtraKeyButton("↑") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_UP) }
+                        ExtraKeyButton("↓") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_DOWN) }
+                        ExtraKeyButton("←") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT) }
+                        ExtraKeyButton("→") { sendKeyEvent(KeyEvent.KEYCODE_DPAD_RIGHT) }
+                        ExtraKeyButton("^C") { sendToCurrentSession("\u0003") }
+                        ExtraKeyButton("-") { sendToCurrentSession("-") }
+                        ExtraKeyButton("/") { sendToCurrentSession("/") }
+                        ExtraKeyButton("|") { sendToCurrentSession("|") }
+                        ExtraKeyButton("~") { sendToCurrentSession("~") }
+                        ExtraKeyButton("PASTE") { pasteFromClipboard() }
+                    }
                 }
             }
         }
@@ -1475,6 +1651,75 @@ class MainActivity : ComponentActivity() {
                         colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabActiveColor)
                     ) {
                         Text("Done", color = Color.White)
+                    }
+                }
+            )
+        }
+
+        // OEM Battery Optimization Exemption Dialog
+        if (showBatteryOptDialog) {
+            AlertDialog(
+                onDismissRequest = { showBatteryOptDialog = false },
+                containerColor = currentTheme.topBarColor,
+                title = {
+                    Text(
+                        text = "Background Keep-Alive",
+                        color = currentTheme.fgColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "ArchDroid runs PRoot, background terminal jobs, and AI agents. Android's aggressive battery optimizer will kill long-running sessions, downloads, and servers when the app is in the background or screen is off.",
+                            color = currentTheme.fgColor.copy(alpha = 0.85f),
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Exempt ArchDroid from battery restrictions to ensure uninterrupted background execution.",
+                            color = Color(0xFF1793D1),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            lineHeight = 16.sp
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showBatteryOptDialog = false
+                            try {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                        data = Uri.parse("package:$packageName")
+                                    }
+                                    startActivity(intent)
+                                }
+                            } catch (_: Throwable) {
+                                try {
+                                    startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                } catch (_: Throwable) {}
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
+                    ) {
+                        Text("Disable Restriction", color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showBatteryOptDialog = false
+                            getSharedPreferences("archdroid_prefs", Context.MODE_PRIVATE)
+                                .edit()
+                                .putBoolean("battery_opt_dismissed", true)
+                                .apply()
+                        }
+                    ) {
+                        Text("Don't Ask Again", color = currentTheme.fgColor.copy(alpha = 0.6f))
                     }
                 }
             )

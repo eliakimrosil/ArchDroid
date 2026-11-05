@@ -259,7 +259,7 @@ object TerminalSelectionController {
         val text = getSelectedText(view)
         if (!text.isNullOrEmpty()) {
             val cm = view.context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            cm.setPrimaryClip(ClipData.newPlainText("AlpineTerminal", text))
+            cm.setPrimaryClip(ClipData.newPlainText("ArchDroidTerminal", text))
         }
         if (andClear) {
             clearSelection(view)

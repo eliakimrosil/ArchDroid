@@ -31,7 +31,7 @@ object TerminalSessionHolder {
         client: TerminalSessionClient,
         initialCommand: String? = null
     ): TerminalSession {
-        val session = ProotSessionManager.createAlpineSession(context, client, initialCommand)
+        val session = ProotSessionManager.createArchSession(context, client, initialCommand)
         sessions.add(session)
         currentSessionIndex = sessions.size - 1
         TerminalForegroundService.updateNotification(context)
@@ -68,7 +68,7 @@ object TerminalSessionHolder {
             terminateSessionGracefully(sessionToClose)
 
             if (sessions.isEmpty()) {
-                val newSession = ProotSessionManager.createAlpineSession(context, client)
+                val newSession = ProotSessionManager.createArchSession(context, client)
                 sessions.add(newSession)
                 currentSessionIndex = 0
             } else {
