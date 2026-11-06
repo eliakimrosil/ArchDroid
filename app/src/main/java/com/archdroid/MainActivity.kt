@@ -39,6 +39,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
@@ -897,7 +905,43 @@ class MainActivity : ComponentActivity() {
                 return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_ESCAPE) {
-                sendToCurrentSession("\u001b")
+                when {
+                    showLogDialog -> {
+                        showLogDialog = false
+                        return true
+                    }
+                    showAutomationsDialog -> {
+                        showAutomationsDialog = false
+                        return true
+                    }
+                    showSettingsDialog -> {
+                        if (!backupOpInProgress) showSettingsDialog = false
+                        return true
+                    }
+                    showRenameDialog -> {
+                        showRenameDialog = false
+                        return true
+                    }
+                    showResetConfirmDialog -> {
+                        showResetConfirmDialog = false
+                        return true
+                    }
+                    showRestoreConfirmDialog -> {
+                        if (!backupOpInProgress) showRestoreConfirmDialog = false
+                        return true
+                    }
+                    showBatteryOptDialog -> {
+                        showBatteryOptDialog = false
+                        return true
+                    }
+                    else -> {
+                        sendToCurrentSession("\u001b")
+                        return true
+                    }
+                }
+            }
+        } else if (event.action == KeyEvent.ACTION_UP && event.keyCode == KeyEvent.KEYCODE_ESCAPE) {
+            if (showLogDialog || showAutomationsDialog || showSettingsDialog || showRenameDialog || showResetConfirmDialog || showRestoreConfirmDialog || showBatteryOptDialog) {
                 return true
             }
         }
@@ -2647,9 +2691,11 @@ class MainActivity : ComponentActivity() {
     private fun AutomationsDashboardDialog() {
         val screenWidth = LocalConfiguration.current.screenWidthDp
         val isWide = screenWidth >= 600
+        val focusRequester = remember { FocusRequester() }
 
         LaunchedEffect(Unit) {
             refreshAutomations()
+            focusRequester.requestFocus()
         }
 
         Dialog(
@@ -2662,6 +2708,14 @@ class MainActivity : ComponentActivity() {
         ) {
             Card(
                 modifier = Modifier
+                    .focusRequester(focusRequester)
+                    .focusable()
+                    .onPreviewKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.Escape) {
+                            showAutomationsDialog = false
+                            true
+                        } else false
+                    }
                     .widthIn(min = if (isWide) 700.dp else 300.dp, max = if (isWide) 1400.dp else 440.dp)
                     .fillMaxWidth(if (isWide) 0.80f else 0.96f)
                     .heightIn(min = if (isWide) 560.dp else 400.dp, max = if (isWide) 880.dp else 750.dp)
@@ -2989,6 +3043,11 @@ class MainActivity : ComponentActivity() {
     private fun AutomationLogDialog() {
         val screenWidth = LocalConfiguration.current.screenWidthDp
         val isWide = screenWidth >= 600
+        val focusRequester = remember { FocusRequester() }
+
+        LaunchedEffect(Unit) {
+            focusRequester.requestFocus()
+        }
 
         Dialog(
             onDismissRequest = { showLogDialog = false },
@@ -3000,6 +3059,14 @@ class MainActivity : ComponentActivity() {
         ) {
             Card(
                 modifier = Modifier
+                    .focusRequester(focusRequester)
+                    .focusable()
+                    .onPreviewKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.Escape) {
+                            showLogDialog = false
+                            true
+                        } else false
+                    }
                     .widthIn(min = if (isWide) 700.dp else 300.dp, max = if (isWide) 1400.dp else 440.dp)
                     .fillMaxWidth(if (isWide) 0.80f else 0.96f)
                     .heightIn(min = if (isWide) 560.dp else 380.dp, max = if (isWide) 880.dp else 750.dp)
