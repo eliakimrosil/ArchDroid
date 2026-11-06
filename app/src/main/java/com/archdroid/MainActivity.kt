@@ -1808,38 +1808,83 @@ class MainActivity : ComponentActivity() {
         // Unified Settings Hub (Option A)
         if (showSettingsDialog) {
             val settingsTabs = listOf("Appearance", "System", "Backup", "Storage", "About")
+            val screenWidth = LocalConfiguration.current.screenWidthDp
+            val isWide = screenWidth >= 600
+            val focusRequester = remember { FocusRequester() }
 
-            AlertDialog(
+            LaunchedEffect(Unit) {
+                focusRequester.requestFocus()
+            }
+
+            Dialog(
                 onDismissRequest = {
                     if (!backupOpInProgress) showSettingsDialog = false
                 },
-                containerColor = currentTheme.topBarColor,
-                title = {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = null,
-                            tint = Color(0xFF1793D1),
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Settings",
-                            color = currentTheme.fgColor,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
-                    }
-                },
-                text = {
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    dismissOnBackPress = true,
+                    dismissOnClickOutside = true
+                )
+            ) {
+                Card(
+                    modifier = Modifier
+                        .focusRequester(focusRequester)
+                        .focusable()
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.Escape) {
+                                if (!backupOpInProgress) showSettingsDialog = false
+                                true
+                            } else false
+                        }
+                        .widthIn(min = if (isWide) 700.dp else 300.dp, max = if (isWide) 1400.dp else 440.dp)
+                        .fillMaxWidth(if (isWide) 0.80f else 0.96f)
+                        .heightIn(min = if (isWide) 560.dp else 400.dp, max = if (isWide) 880.dp else 750.dp)
+                        .fillMaxHeight(if (isWide) 0.80f else 0.88f),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = currentTheme.topBarColor),
+                    border = BorderStroke(1.dp, Color(0xFF30363D))
+                ) {
                     Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .fillMaxHeight(0.85f)
+                            .fillMaxSize()
+                            .padding(16.dp)
                     ) {
+                        // Header: Title and Close (✕)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = null,
+                                    tint = Color(0xFF1793D1),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Settings",
+                                    color = currentTheme.fgColor,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp
+                                )
+                            }
+                            IconButton(
+                                onClick = { if (!backupOpInProgress) showSettingsDialog = false },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close",
+                                    tint = currentTheme.fgColor.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
                         // Category Tabs (Horizontal Chips)
                         Row(
                             modifier = Modifier
@@ -2538,17 +2583,23 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = { showSettingsDialog = false },
-                        colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabActiveColor)
-                    ) {
-                        Text("Done", color = Color.White)
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Button(
+                                onClick = { if (!backupOpInProgress) showSettingsDialog = false },
+                                enabled = !backupOpInProgress,
+                                colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabActiveColor)
+                            ) {
+                                Text("Done", color = Color.White)
+                            }
+                        }
                     }
                 }
-            )
+            }
         }
 
         // Factory Reset Confirmation Dialog
