@@ -2645,6 +2645,9 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun AutomationsDashboardDialog() {
+        val screenWidth = LocalConfiguration.current.screenWidthDp
+        val isWide = screenWidth >= 600
+
         LaunchedEffect(Unit) {
             refreshAutomations()
         }
@@ -2659,8 +2662,9 @@ class MainActivity : ComponentActivity() {
         ) {
             Card(
                 modifier = Modifier
-                    .fillMaxWidth(0.96f)
-                    .fillMaxHeight(0.88f),
+                    .fillMaxWidth(if (isWide) 0.85f else 0.96f)
+                    .widthIn(max = 880.dp)
+                    .fillMaxHeight(if (isWide) 0.82f else 0.88f),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = currentTheme.topBarColor),
                 border = BorderStroke(1.dp, Color(0xFF30363D))
@@ -2775,177 +2779,34 @@ class MainActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Responsive 2-Row Task Cards
+                    // Responsive Task Cards: 2-column grid on desktop/wide, 1-column on mobile
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(automationsList) { item ->
-                            val isRunning = ArchDroidAutomationManager.runningJobIds.contains(item.id)
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(currentTheme.bgColor)
-                                    .border(
-                                        width = 1.dp,
-                                        color = if (isRunning) Color(0xFF58A6FF) else Color(0xFF30363D),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(horizontal = 10.dp, vertical = 8.dp)
-                            ) {
-                                Column {
-                                    // Row 1: ID badge, Automation Full Title, Status Pill
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.weight(1f, fill = false)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .background(Color(0xFF1F6FEB).copy(alpha = 0.25f))
-                                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                                            ) {
-                                                Text(
-                                                    text = "#${item.id}",
-                                                    color = Color(0xFF58A6FF),
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontFamily = FontFamily.Monospace
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = item.name,
-                                                color = currentTheme.fgColor,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.width(6.dp))
-
-                                        // Status badge
-                                        if (isRunning) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .background(Color(0xFFD29922).copy(alpha = 0.25f))
-                                                    .padding(horizontal = 5.dp, vertical = 1.5.dp)
-                                            ) {
-                                                Text(
-                                                    text = "⚡ RUNNING",
-                                                    color = Color(0xFFE3B341),
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        } else {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .background(
-                                                        if (item.persisted) Color(0xFF238636).copy(alpha = 0.2f)
-                                                        else Color(0xFF8B949E).copy(alpha = 0.2f)
-                                                    )
-                                                    .padding(horizontal = 5.dp, vertical = 1.5.dp)
-                                            ) {
-                                                Text(
-                                                    text = if (item.persisted) "SCHEDULED" else "INACTIVE",
-                                                    color = if (item.persisted) Color(0xFF7EE787) else Color(0xFF8B949E),
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
+                        if (isWide) {
+                            items(automationsList.chunked(2)) { pair ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        AutomationCard(pair[0])
                                     }
-
-                                    Spacer(modifier = Modifier.height(6.dp))
-
-                                    // Row 2: Left column (Schedule & Last run) + Right column (Logs & Run buttons)
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = "🕒 ${item.schedule}",
-                                                color = currentTheme.fgColor.copy(alpha = 0.8f),
-                                                fontSize = 10.sp,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            Spacer(modifier = Modifier.height(1.dp))
-                                            Text(
-                                                text = "⏱ Last: ${item.lastRun}",
-                                                color = Color(0xFF58A6FF),
-                                                fontSize = 9.5.sp,
-                                                fontFamily = FontFamily.Monospace,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
+                                    if (pair.size > 1) {
+                                        Box(modifier = Modifier.weight(1f)) {
+                                            AutomationCard(pair[1])
                                         }
-
-                                        Spacer(modifier = Modifier.width(8.dp))
-
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            // Logs Button
-                                            OutlinedButton(
-                                                onClick = { showJobLogs(item) },
-                                                modifier = Modifier.height(26.dp),
-                                                contentPadding = PaddingValues(horizontal = 7.dp, vertical = 0.dp),
-                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = currentTheme.fgColor),
-                                                border = BorderStroke(0.8.dp, Color(0xFF30363D))
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Description,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(11.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(3.dp))
-                                                Text("Logs", fontSize = 10.sp)
-                                            }
-
-                                            Spacer(modifier = Modifier.width(5.dp))
-
-                                            // Run Button
-                                            Button(
-                                                onClick = {
-                                                    ArchDroidAutomationManager.executeAutomation(
-                                                        this@MainActivity,
-                                                        item,
-                                                        force = true
-                                                    ) {
-                                                        refreshAutomations()
-                                                    }
-                                                    refreshAutomations()
-                                                },
-                                                enabled = !isRunning,
-                                                modifier = Modifier.height(26.dp),
-                                                contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp),
-                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636))
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.PlayArrow,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(3.dp))
-                                                Text(if (isRunning) "..." else "Run", fontSize = 10.sp, color = Color.White)
-                                            }
-                                        }
+                                    } else {
+                                        Spacer(modifier = Modifier.weight(1f))
                                     }
                                 }
+                            }
+                        } else {
+                            items(automationsList) { item ->
+                                AutomationCard(item)
                             }
                         }
                     }
@@ -2955,7 +2816,178 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
+    private fun AutomationCard(item: AutomationItem) {
+        val isRunning = ArchDroidAutomationManager.runningJobIds.contains(item.id)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(currentTheme.bgColor)
+                .border(
+                    width = 1.dp,
+                    color = if (isRunning) Color(0xFF58A6FF) else Color(0xFF30363D),
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+        ) {
+            Column {
+                // Row 1: ID badge, Automation Full Title, Status Pill
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFF1F6FEB).copy(alpha = 0.25f))
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                text = "#${item.id}",
+                                color = Color(0xFF58A6FF),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = item.name,
+                            color = currentTheme.fgColor,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    // Status badge
+                    if (isRunning) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFFD29922).copy(alpha = 0.25f))
+                                .padding(horizontal = 5.dp, vertical = 1.5.dp)
+                        ) {
+                            Text(
+                                text = "⚡ RUNNING",
+                                color = Color(0xFFE3B341),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(
+                                    if (item.persisted) Color(0xFF238636).copy(alpha = 0.2f)
+                                    else Color(0xFF8B949E).copy(alpha = 0.2f)
+                                )
+                                .padding(horizontal = 5.dp, vertical = 1.5.dp)
+                        ) {
+                            Text(
+                                text = if (item.persisted) "SCHEDULED" else "INACTIVE",
+                                color = if (item.persisted) Color(0xFF7EE787) else Color(0xFF8B949E),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Row 2: Left column (Schedule & Last run) + Right column (Logs & Run buttons)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "🕒 ${item.schedule}",
+                            color = currentTheme.fgColor.copy(alpha = 0.8f),
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(1.dp))
+                        Text(
+                            text = "⏱ Last: ${item.lastRun}",
+                            color = Color(0xFF58A6FF),
+                            fontSize = 9.5.sp,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Logs Button
+                        OutlinedButton(
+                            onClick = { showJobLogs(item) },
+                            modifier = Modifier.height(26.dp),
+                            contentPadding = PaddingValues(horizontal = 7.dp, vertical = 0.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = currentTheme.fgColor),
+                            border = BorderStroke(0.8.dp, Color(0xFF30363D))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Description,
+                                contentDescription = null,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("Logs", fontSize = 10.sp)
+                        }
+
+                        Spacer(modifier = Modifier.width(5.dp))
+
+                        // Run Button
+                        Button(
+                            onClick = {
+                                ArchDroidAutomationManager.executeAutomation(
+                                    this@MainActivity,
+                                    item,
+                                    force = true
+                                ) {
+                                    refreshAutomations()
+                                }
+                                refreshAutomations()
+                            },
+                            enabled = !isRunning,
+                            modifier = Modifier.height(26.dp),
+                            contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(if (isRunning) "..." else "Run", fontSize = 10.sp, color = Color.White)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
     private fun AutomationLogDialog() {
+        val screenWidth = LocalConfiguration.current.screenWidthDp
+        val isWide = screenWidth >= 600
+
         Dialog(
             onDismissRequest = { showLogDialog = false },
             properties = DialogProperties(
@@ -2966,8 +2998,9 @@ class MainActivity : ComponentActivity() {
         ) {
             Card(
                 modifier = Modifier
-                    .fillMaxWidth(0.96f)
-                    .fillMaxHeight(0.84f),
+                    .fillMaxWidth(if (isWide) 0.80f else 0.96f)
+                    .widthIn(max = 840.dp)
+                    .fillMaxHeight(if (isWide) 0.80f else 0.84f),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = currentTheme.topBarColor),
                 border = BorderStroke(1.dp, Color(0xFF30363D))
