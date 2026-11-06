@@ -40,4 +40,4 @@ cd /home/eliakimrosil/Projects/AndroidApp/ArchDroid
 /home/eliakimrosil/gradle/gradle-8.7/bin/gradle assembleDebug
 ```
 
-Built APKs are automatically placed in `/sdcard/Download/ArchDroid-debug.apk` (and `/sdcard/Download/KimSystem-debug.apk`).
+Built APK is automatically placed in `/sdcard/Download/ArchDroid-debug.apk`.

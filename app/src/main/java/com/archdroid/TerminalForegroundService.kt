@@ -58,7 +58,7 @@ class TerminalForegroundService : Service() {
             if (wakeLock == null) {
                 wakeLock = pm.newWakeLock(
                     PowerManager.PARTIAL_WAKE_LOCK,
-                    "KimSystem::RuntimeWakeLock"
+                    "ArchDroid::RuntimeWakeLock"
                 ).apply {
                     setReferenceCounted(false)
                     acquire()
@@ -72,7 +72,7 @@ class TerminalForegroundService : Service() {
                 } else {
                     WifiManager.WIFI_MODE_FULL_HIGH_PERF
                 }
-                wifiLock = wm.createWifiLock(mode, "KimSystem::WifiLock").apply {
+                wifiLock = wm.createWifiLock(mode, "ArchDroid::WifiLock").apply {
                     setReferenceCounted(false)
                     acquire()
                 }
@@ -93,10 +93,10 @@ class TerminalForegroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "KimSystem Runtime",
+                "ArchDroid Runtime",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Keeps KimSystem runtime and CLI agents active in the background"
+                description = "Keeps ArchDroid runtime and CLI agents active in the background"
             }
             val nm = getSystemService(NotificationManager::class.java)
             nm?.createNotificationChannel(channel)
