@@ -16,7 +16,7 @@ import kotlin.math.min
  * High-performance terminal text selection controller optimized for:
  * 1. Samsung DeX & Android Desktop keyboard navigation (Shift + Arrows, Home, End, PgUp, PgDn, Ctrl+C, Enter, Esc).
  * 2. Precision mouse interaction (left-drag select, word double-click, line triple-click, right-click copy/paste, middle-click paste).
- * 3. Seamless native rendering via Termux TerminalView & TerminalRenderer.
+ * 3. Seamless native rendering via TerminalView & TerminalRenderer.
  */
 object TerminalSelectionController {
 
@@ -160,7 +160,7 @@ object TerminalSelectionController {
     }
 
     /**
-     * Sets selection coordinates directly in Termux TextSelectionCursorController
+     * Sets selection coordinates directly in TextSelectionCursorController
      * and triggers a high-speed view invalidation for native rendering.
      */
     fun setSelection(

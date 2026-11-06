@@ -1261,7 +1261,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Center: Real Termux TerminalView attached to ArchDroid PRoot session
+            // Center: ArchDroid TerminalView attached to PRoot session
             AndroidView(
                 modifier = Modifier
                     .weight(1f)
