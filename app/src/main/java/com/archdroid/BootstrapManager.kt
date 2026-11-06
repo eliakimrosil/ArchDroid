@@ -791,15 +791,15 @@ object BootstrapManager {
                     echo "✗ FAILED"
                 fi
 
-                echo -n "[4/5] Checking CLI Compatibility Tools... "
+                echo -n "[4/5] Checking CLI Native Tools... "
                 MISSING=0
-                for cmd in termux-notification termux-toast termux-wake-lock termux-battery-status termux-job-scheduler; do
+                for cmd in archdroid-notification archdroid-toast archdroid-wake-lock archdroid-battery-status archdroid-job-scheduler; do
                     if ! command -v "%S%cmd" >/dev/null 2>&1; then
                         MISSING=%S%((MISSING + 1))
                     fi
                 done
                 if [ %S%MISSING -eq 0 ]; then
-                    echo "✓ ALL 9 TOOLS READY"
+                    echo "✓ ALL 10 TOOLS READY"
                 else
                     echo "✗ %S%MISSING TOOLS MISSING"
                 fi
@@ -807,43 +807,11 @@ object BootstrapManager {
                 echo ""
                 echo "[5/5] Active Background Jobs in Android JobScheduler:"
                 echo "------------------------------------------------------------"
-                termux-job-scheduler -p
+                archdroid-job-scheduler -p
                 echo "============================================================"
                 """.trimIndent().replace("%S%", "$") + "\n"
             )
             chmodSafe(doctorScript, 493)
-
-            // Drop-in compatibility wrappers for Termux tools
-            val termuxMappings = listOf(
-                "termux-notification" to "archdroid-notification",
-                "termux-toast" to "archdroid-toast",
-                "termux-wake-lock" to "archdroid-wake-lock",
-                "termux-wake-unlock" to "archdroid-wake-unlock",
-                "termux-battery-status" to "archdroid-battery-status",
-                "termux-clipboard-get" to "archdroid-clipboard-get",
-                "termux-clipboard-set" to "archdroid-clipboard-set",
-                "termux-vibrate" to "archdroid-vibrate",
-                "termux-job-scheduler" to "archdroid-job-scheduler"
-            )
-
-            termuxMappings.forEach { (tName, aName) ->
-                val wrapFile = File(localBin, tName)
-                wrapFile.writeText(
-                    """
-                    #!/bin/bash
-                    exec /usr/local/bin/$aName "%S%@"
-                    """.trimIndent().replace("%S%", "$") + "\n"
-                )
-                chmodSafe(wrapFile, 493)
-
-                // Also ensure symlink in /usr/bin for scripts expecting it in /usr/bin
-                val usrBinFile = File(destDir, "usr/bin/$tName")
-                if (!usrBinFile.exists()) {
-                    try {
-                        Os.symlink("/usr/local/bin/$tName", usrBinFile.absolutePath)
-                    } catch (_: Throwable) {}
-                }
-            }
 
             listOf(
                 "archdroid-notification",
@@ -867,26 +835,6 @@ object BootstrapManager {
                     } catch (_: Throwable) {}
                 }
             }
-
-            // Compatibility shebangs and legacy paths for Termux scripts
-            try {
-                val termuxUsrDir = File(destDir, "data/data/com.termux/files/usr")
-                termuxUsrDir.mkdirs()
-                val termuxBinLink = File(termuxUsrDir, "bin")
-                if (!termuxBinLink.exists()) {
-                    try {
-                        Os.symlink("/usr/bin", termuxBinLink.absolutePath)
-                    } catch (_: Throwable) {}
-                }
-
-                val termuxFilesDir = File(destDir, "data/data/com.termux/files")
-                val termuxHomeLink = File(termuxFilesDir, "home")
-                if (!termuxHomeLink.exists()) {
-                    try {
-                        Os.symlink("/root", termuxHomeLink.absolutePath)
-                    } catch (_: Throwable) {}
-                }
-            } catch (_: Throwable) {}
 
             // Ensure executable permissions on all critical binaries across reboots
             listOf(
@@ -912,16 +860,7 @@ object BootstrapManager {
                 "usr/local/bin/archdroid-vibrate",
                 "usr/local/bin/archdroid-job-scheduler",
                 "usr/local/bin/archdroid-status",
-                "usr/local/bin/archdroid-doctor",
-                "usr/local/bin/termux-notification",
-                "usr/local/bin/termux-toast",
-                "usr/local/bin/termux-wake-lock",
-                "usr/local/bin/termux-wake-unlock",
-                "usr/local/bin/termux-battery-status",
-                "usr/local/bin/termux-clipboard-get",
-                "usr/local/bin/termux-clipboard-set",
-                "usr/local/bin/termux-vibrate",
-                "usr/local/bin/termux-job-scheduler"
+                "usr/local/bin/archdroid-doctor"
             ).forEach { relPath ->
                 val f = File(destDir, relPath)
                 if (f.exists()) {
@@ -938,51 +877,50 @@ object BootstrapManager {
     fun writeAgentDocumentation(destDir: File) {
         try {
             val docContent = """
-            # ArchDroid Native Automation Subsystem (Standalone Architecture)
+            # ArchDroid Native Automation Subsystem (Pure Standalone Architecture)
 
-            ArchDroid runs independently of Termux and Termux:API. It contains a native Android host IPC bridge running on http://127.0.0.1:48292 powered by ArchDroidApiServer inside the Android application.
+            ArchDroid is a standalone Linux terminal and automation platform for Android. It operates independently with its own native Android host IPC bridge running on http://127.0.0.1:48292 powered by ArchDroidApiServer inside the Android application.
 
-            ### Available Automation & Device Tools
-            All tools below are fully functional inside ArchDroid and connect to the real Android OS:
+            ### Native ArchDroid Automation Tools (Installed in /usr/bin & /usr/local/bin)
+            All tools below are fully functional native ArchDroid CLI tools that interface directly with the Android OS:
 
-            1. Notifications (archdroid-notification / termux-notification):
+            1. Notifications (archdroid-notification):
                - Displays real Android status-bar notifications via NotificationManagerCompat.
                - Flags: -t <title>, -c <content>, -i <id>, -p <priority: low|default|high>.
-               - Supports pipeline stdin (echo "message" | termux-notification -t "Title").
+               - Supports pipeline stdin (echo "message" | archdroid-notification -t "Title").
 
-            2. Toasts (archdroid-toast / termux-toast):
+            2. Toasts (archdroid-toast):
                - Displays real Android screen toasts.
                - Flags: -s (short, default), -l (long).
 
-            3. Wake Locks (archdroid-wake-lock / termux-wake-lock, archdroid-wake-unlock / termux-wake-unlock):
+            3. Wake Locks (archdroid-wake-lock, archdroid-wake-unlock):
                - Acquires and releases real Android PowerManager.PARTIAL_WAKE_LOCK to keep the CPU awake during long-running tasks.
-               - Includes a 2-hour automatic safety watchdog to prevent unintended battery drain.
+               - Includes a 2-hour automatic safety watchdog to prevent unintended battery depletion.
 
-            4. Battery Status (archdroid-battery-status / termux-battery-status):
-               - Returns live JSON format matching Termux API: {"percentage":85,"status":"DISCHARGING","plugged":"UNPLUGGED","health":"GOOD","temperature":31.2}.
+            4. Battery Status (archdroid-battery-status):
+               - Returns live JSON format: {"percentage":85,"status":"DISCHARGING","plugged":"UNPLUGGED","health":"GOOD","temperature":31.2}.
 
-            5. Clipboard (archdroid-clipboard-get / termux-clipboard-get, archdroid-clipboard-set / termux-clipboard-set):
+            5. Clipboard (archdroid-clipboard-get, archdroid-clipboard-set):
                - Directly reads and writes the Android OS system clipboard.
 
-            6. Haptic Vibration (archdroid-vibrate / termux-vibrate):
+            6. Haptic Vibration (archdroid-vibrate):
                - Triggers device haptic feedback (-d <duration_ms>).
 
-            7. Background Job Scheduler (archdroid-job-scheduler / termux-job-scheduler):
+            7. Background Job Scheduler (archdroid-job-scheduler):
                - Backed by Android OS native JobScheduler and ArchDroidJobService.
                - Survives device reboots (persisted jobs automatically restored by ArchDroidBootReceiver).
                - Runs headless tasks via PRoot even when the terminal window is closed.
                - Commands:
-                 - termux-job-scheduler -p: List all active scheduled jobs.
-                 - termux-job-scheduler --job-id <ID> --script <PATH> --period-ms <MS> --persisted true: Register/update a periodic job (min 15 mins / 900000ms).
-                 - termux-job-scheduler --cancel --job-id <ID>: Cancel a scheduled job.
-                 - termux-job-scheduler --cancel-all: Cancel all scheduled jobs.
+                 - archdroid-job-scheduler -p: List all active scheduled jobs.
+                 - archdroid-job-scheduler --job-id <ID> --script <PATH> --period-ms <MS> --persisted true: Register/update a periodic job (min 15 mins / 900000ms).
+                 - archdroid-job-scheduler --cancel --job-id <ID>: Cancel a scheduled job.
+                 - archdroid-job-scheduler --cancel-all: Cancel all scheduled jobs.
 
             8. Diagnostic Tool (archdroid-status / archdroid-doctor):
-               - Quick health check of the local API bridge and running services.
+               - Quick health check of the local API bridge, device services, and registered jobs.
 
-            ### Drop-in Compatibility Guarantees
-            - All termux-* binary names exist in /usr/local/bin and /usr/bin as drop-in wrappers. They are REAL Android APIs, not mock shims.
-            - Legacy shebangs (#!/data/data/com.termux/files/usr/bin/bash) automatically resolve through internal compatibility symlinks to /usr/bin/bash.
+            ### Standard Automation Guidelines
+            - All scripts should use standard bash shebang: #!/bin/bash.
             - Automation scripts reside in ~/Automation/ with individual job IDs.
             """.trimIndent() + "\n"
 
@@ -996,6 +934,8 @@ object BootstrapManager {
             val existing = if (rootAgentsFile.exists()) rootAgentsFile.readText() else ""
             if (!existing.contains("ArchDroid Native Automation Subsystem")) {
                 rootAgentsFile.writeText(existing + "\n\n" + docContent)
+            } else {
+                rootAgentsFile.writeText(docContent)
             }
 
             val skelAgentsDir = File(destDir, "etc/skel/.agents")
@@ -1031,7 +971,7 @@ object BootstrapManager {
                     #!/bin/bash
                     # Example ArchDroid Background Automation
                     echo "[%S%(date '+%Y-%m-%d %H:%M:%S')] ArchDroid automation heartbeat active" >> /root/Automation/welcome-task/heartbeat.log
-                    termux-toast "ArchDroid background automation tick" >/dev/null 2>&1 || true
+                    archdroid-toast "ArchDroid background automation tick" >/dev/null 2>&1 || true
                     """.trimIndent().replace("%S%", "$") + "\n"
                 )
                 chmodSafe(welcomeScript, 493)

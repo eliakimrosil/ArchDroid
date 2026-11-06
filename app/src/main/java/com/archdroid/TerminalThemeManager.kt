@@ -312,13 +312,13 @@ object TerminalThemeManager {
     }
 
     fun resolveTypeface(context: Context): Typeface {
-        // 1. Check for custom font placed in /sdcard/font.ttf or /sdcard/.termux/font.ttf
+        // 1. Check for custom font placed in /sdcard/font.ttf or /sdcard/.archdroid/font.ttf
         try {
             val custom1 = File("/sdcard/font.ttf")
             if (custom1.exists() && custom1.canRead()) {
                 return Typeface.createFromFile(custom1)
             }
-            val custom2 = File("/sdcard/.termux/font.ttf")
+            val custom2 = File("/sdcard/.archdroid/font.ttf")
             if (custom2.exists() && custom2.canRead()) {
                 return Typeface.createFromFile(custom2)
             }
