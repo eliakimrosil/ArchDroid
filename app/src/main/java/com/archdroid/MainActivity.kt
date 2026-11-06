@@ -2662,16 +2662,16 @@ class MainActivity : ComponentActivity() {
         ) {
             Card(
                 modifier = Modifier
-                    .fillMaxWidth(if (isWide) 0.85f else 0.96f)
-                    .widthIn(max = 880.dp)
-                    .fillMaxHeight(if (isWide) 0.82f else 0.88f),
+                    .widthIn(max = if (isWide) 700.dp else 440.dp)
+                    .fillMaxWidth(0.95f)
+                    .heightIn(max = if (isWide) 540.dp else 680.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = currentTheme.topBarColor),
                 border = BorderStroke(1.dp, Color(0xFF30363D))
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
                         .padding(14.dp)
                 ) {
                     // Header: Title, Refresh, Close
@@ -2783,7 +2783,7 @@ class MainActivity : ComponentActivity() {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f),
+                            .heightIn(max = if (isWide) 400.dp else 520.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (isWide) {
@@ -2998,16 +2998,16 @@ class MainActivity : ComponentActivity() {
         ) {
             Card(
                 modifier = Modifier
-                    .fillMaxWidth(if (isWide) 0.80f else 0.96f)
-                    .widthIn(max = 840.dp)
-                    .fillMaxHeight(if (isWide) 0.80f else 0.84f),
+                    .widthIn(max = if (isWide) 720.dp else 440.dp)
+                    .fillMaxWidth(0.95f)
+                    .heightIn(max = if (isWide) 540.dp else 660.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = currentTheme.topBarColor),
                 border = BorderStroke(1.dp, Color(0xFF30363D))
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
                         .padding(14.dp)
                 ) {
                     // Header: Title, Refresh, Close
@@ -3068,7 +3068,7 @@ class MainActivity : ComponentActivity() {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f)
+                            .heightIn(min = 220.dp, max = if (isWide) 400.dp else 480.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFF0D1117))
                             .border(1.dp, Color(0xFF30363D), RoundedCornerShape(8.dp))
