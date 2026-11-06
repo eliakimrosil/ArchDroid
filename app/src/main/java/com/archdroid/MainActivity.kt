@@ -2662,10 +2662,10 @@ class MainActivity : ComponentActivity() {
         ) {
             Card(
                 modifier = Modifier
-                    .widthIn(min = if (isWide) 640.dp else 300.dp, max = if (isWide) 1150.dp else 440.dp)
-                    .fillMaxWidth(if (isWide) 0.65f else 0.96f)
-                    .heightIn(min = if (isWide) 520.dp else 400.dp, max = if (isWide) 760.dp else 750.dp)
-                    .fillMaxHeight(if (isWide) 0.72f else 0.88f),
+                    .widthIn(min = if (isWide) 700.dp else 300.dp, max = if (isWide) 1400.dp else 440.dp)
+                    .fillMaxWidth(if (isWide) 0.80f else 0.96f)
+                    .heightIn(min = if (isWide) 560.dp else 400.dp, max = if (isWide) 880.dp else 750.dp)
+                    .fillMaxHeight(if (isWide) 0.80f else 0.88f),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = currentTheme.topBarColor),
                 border = BorderStroke(1.dp, Color(0xFF30363D))
@@ -2819,6 +2819,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun AutomationCard(item: AutomationItem) {
         val isRunning = ArchDroidAutomationManager.runningJobIds.contains(item.id)
+        val isWide = LocalConfiguration.current.screenWidthDp >= 600
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2829,7 +2830,7 @@ class MainActivity : ComponentActivity() {
                     color = if (isRunning) Color(0xFF58A6FF) else Color(0xFF30363D),
                     shape = RoundedCornerShape(8.dp)
                 )
-                .padding(horizontal = 10.dp, vertical = 8.dp)
+                .padding(horizontal = if (isWide) 14.dp else 10.dp, vertical = if (isWide) 10.dp else 8.dp)
         ) {
             Column {
                 // Row 1: ID badge, Automation Full Title, Status Pill
@@ -2846,22 +2847,22 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(Color(0xFF1F6FEB).copy(alpha = 0.25f))
-                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                                .padding(horizontal = 5.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = "#${item.id}",
                                 color = Color(0xFF58A6FF),
-                                fontSize = 10.sp,
+                                fontSize = if (isWide) 11.sp else 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace
                             )
                         }
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = item.name,
                             color = currentTheme.fgColor,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
+                            fontSize = if (isWide) 14.sp else 13.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -2875,12 +2876,12 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(Color(0xFFD29922).copy(alpha = 0.25f))
-                                .padding(horizontal = 5.dp, vertical = 1.5.dp)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = "⚡ RUNNING",
                                 color = Color(0xFFE3B341),
-                                fontSize = 9.sp,
+                                fontSize = if (isWide) 10.sp else 9.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -2892,19 +2893,19 @@ class MainActivity : ComponentActivity() {
                                     if (item.persisted) Color(0xFF238636).copy(alpha = 0.2f)
                                     else Color(0xFF8B949E).copy(alpha = 0.2f)
                                 )
-                                .padding(horizontal = 5.dp, vertical = 1.5.dp)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = if (item.persisted) "SCHEDULED" else "INACTIVE",
                                 color = if (item.persisted) Color(0xFF7EE787) else Color(0xFF8B949E),
-                                fontSize = 9.sp,
+                                fontSize = if (isWide) 10.sp else 9.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Row 2: Left column (Schedule & Last run) + Right column (Logs & Run buttons)
                 Row(
@@ -2915,43 +2916,43 @@ class MainActivity : ComponentActivity() {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "🕒 ${item.schedule}",
-                            color = currentTheme.fgColor.copy(alpha = 0.8f),
-                            fontSize = 10.sp,
+                            color = currentTheme.fgColor.copy(alpha = 0.85f),
+                            fontSize = if (isWide) 11.sp else 10.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(modifier = Modifier.height(1.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "⏱ Last: ${item.lastRun}",
                             color = Color(0xFF58A6FF),
-                            fontSize = 9.5.sp,
+                            fontSize = if (isWide) 10.5.sp else 9.5.sp,
                             fontFamily = FontFamily.Monospace,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // Logs Button
                         OutlinedButton(
                             onClick = { showJobLogs(item) },
-                            modifier = Modifier.height(26.dp),
-                            contentPadding = PaddingValues(horizontal = 7.dp, vertical = 0.dp),
+                            modifier = Modifier.height(if (isWide) 28.dp else 26.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = currentTheme.fgColor),
                             border = BorderStroke(0.8.dp, Color(0xFF30363D))
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Description,
                                 contentDescription = null,
-                                modifier = Modifier.size(11.dp)
+                                modifier = Modifier.size(12.dp)
                             )
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text("Logs", fontSize = 10.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Logs", fontSize = if (isWide) 11.sp else 10.sp)
                         }
 
-                        Spacer(modifier = Modifier.width(5.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
 
                         // Run Button
                         Button(
@@ -2966,17 +2967,17 @@ class MainActivity : ComponentActivity() {
                                 refreshAutomations()
                             },
                             enabled = !isRunning,
-                            modifier = Modifier.height(26.dp),
-                            contentPadding = PaddingValues(horizontal = 9.dp, vertical = 0.dp),
+                            modifier = Modifier.height(if (isWide) 28.dp else 26.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636))
                         ) {
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
                                 contentDescription = null,
-                                modifier = Modifier.size(12.dp)
+                                modifier = Modifier.size(13.dp)
                             )
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text(if (isRunning) "..." else "Run", fontSize = 10.sp, color = Color.White)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (isRunning) "..." else "Run", fontSize = if (isWide) 11.sp else 10.sp, color = Color.White)
                         }
                     }
                 }
@@ -2999,10 +3000,10 @@ class MainActivity : ComponentActivity() {
         ) {
             Card(
                 modifier = Modifier
-                    .widthIn(min = if (isWide) 640.dp else 300.dp, max = if (isWide) 1100.dp else 440.dp)
-                    .fillMaxWidth(if (isWide) 0.65f else 0.96f)
-                    .heightIn(min = if (isWide) 480.dp else 380.dp, max = if (isWide) 720.dp else 750.dp)
-                    .fillMaxHeight(if (isWide) 0.70f else 0.84f),
+                    .widthIn(min = if (isWide) 700.dp else 300.dp, max = if (isWide) 1400.dp else 440.dp)
+                    .fillMaxWidth(if (isWide) 0.80f else 0.96f)
+                    .heightIn(min = if (isWide) 560.dp else 380.dp, max = if (isWide) 880.dp else 750.dp)
+                    .fillMaxHeight(if (isWide) 0.80f else 0.84f),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = currentTheme.topBarColor),
                 border = BorderStroke(1.dp, Color(0xFF30363D))
