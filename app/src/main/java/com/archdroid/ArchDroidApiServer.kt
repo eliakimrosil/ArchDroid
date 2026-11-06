@@ -317,6 +317,12 @@ object ArchDroidApiServer {
         } catch (_: Throwable) {}
     }
 
+    fun isWakeLockHeld(): Boolean {
+        synchronized(this) {
+            return automationWakeLock?.isHeld == true
+        }
+    }
+
     private fun acquireWakeLock(context: Context): Boolean {
         synchronized(this) {
             try {
@@ -331,7 +337,9 @@ object ArchDroidApiServer {
                 }
                 // Acquire with a 2-hour safety timeout to prevent permanent battery drain
                 automationWakeLock?.acquire(2 * 60 * 60 * 1000L)
-                return automationWakeLock?.isHeld == true
+                val held = automationWakeLock?.isHeld == true
+                TerminalForegroundService.instance?.updateNotification()
+                return held
             } catch (_: Throwable) {
                 return false
             }
@@ -344,6 +352,7 @@ object ArchDroidApiServer {
                 if (automationWakeLock?.isHeld == true) {
                     automationWakeLock?.release()
                 }
+                TerminalForegroundService.instance?.updateNotification()
             } catch (_: Throwable) {}
         }
     }

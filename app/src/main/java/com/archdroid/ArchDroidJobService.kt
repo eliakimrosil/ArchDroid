@@ -27,6 +27,8 @@ class ArchDroidJobService : JobService() {
 
         serviceScope.launch {
             try {
+                activeJobsCount++
+                TerminalForegroundService.instance?.updateNotification()
                 Log.i("ArchDroidJobService", "Executing scheduled Job $jobId: $script")
                 val exitCode = ArchDroidScheduler.executeJobWithWakeLock(
                     applicationContext,
@@ -37,6 +39,8 @@ class ArchDroidJobService : JobService() {
             } catch (e: Throwable) {
                 Log.e("ArchDroidJobService", "Job $jobId failed with error: ${e.message}", e)
             } finally {
+                activeJobsCount = (activeJobsCount - 1).coerceAtLeast(0)
+                TerminalForegroundService.instance?.updateNotification()
                 jobFinished(params, false)
             }
         }
@@ -52,6 +56,12 @@ class ArchDroidJobService : JobService() {
     override fun onDestroy() {
         serviceScope.cancel()
         super.onDestroy()
+    }
+
+    companion object {
+        @Volatile
+        var activeJobsCount = 0
+            private set
     }
 
     private fun getScriptForJob(context: Context, jobId: Int): String? {

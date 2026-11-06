@@ -96,7 +96,7 @@ class TerminalForegroundService : Service() {
                 "ArchDroid Runtime",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Keeps ArchDroid runtime and CLI agents active in the background"
+                description = "Keeps ArchDroid runtime active in the background"
             }
             val nm = getSystemService(NotificationManager::class.java)
             nm?.createNotificationChannel(channel)
@@ -132,7 +132,20 @@ class TerminalForegroundService : Service() {
         )
 
         val count = TerminalSessionHolder.sessions.size
-        val countText = if (count == 1) "1 session active" else "$count sessions active"
+        val activeJobs = ArchDroidJobService.activeJobsCount
+        val baseText = when {
+            count > 0 && activeJobs > 0 -> {
+                val sText = if (count == 1) "1 session" else "$count sessions"
+                val jText = if (activeJobs == 1) "1 task" else "$activeJobs tasks"
+                "$sText, $jText"
+            }
+            count > 0 -> if (count == 1) "1 session" else "$count sessions"
+            activeJobs > 0 -> if (activeJobs == 1) "1 task" else "$activeJobs tasks"
+            else -> "Arch Linux active"
+        }
+
+        val isWakeHeld = (wakeLock?.isHeld == true) || ArchDroidApiServer.isWakeLockHeld()
+        val contentText = if (isWakeHeld) "$baseText (wake lock held)" else baseText
 
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
@@ -143,7 +156,7 @@ class TerminalForegroundService : Service() {
 
         return builder
             .setContentTitle("ArchDroid")
-            .setContentText("$countText • Arch Linux active (agy • claude • codex • hermes)")
+            .setContentText(contentText)
             .setSmallIcon(R.drawable.ic_stat_archdroid)
             .setContentIntent(pendingOpen)
             .setOngoing(true)
@@ -164,9 +177,10 @@ class TerminalForegroundService : Service() {
         const val ACTION_APP_EXIT = "com.archdroid.APP_EXIT"
 
         @Volatile
-        private var instance: TerminalForegroundService? = null
+        var instance: TerminalForegroundService? = null
+            private set
 
-        fun updateNotification(context: Context) {
+        fun updateNotification(context: Context? = null) {
             instance?.updateNotification()
         }
     }

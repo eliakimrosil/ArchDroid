@@ -954,7 +954,7 @@ class MainActivity : ComponentActivity() {
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Mobile Linux Shell • agy • claude • codex • hermes",
+                text = "Mobile Linux Shell & Automation Platform",
                 color = Color(0xFF8B949E),
                 fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace
