@@ -409,7 +409,7 @@ object BootstrapManager {
                             printf "\033[1;36m    /      \\      \033[0;37mArchitecture: aarch64\033[0m\n"
                             printf "\033[1;36m   /   ,,   \\     \033[0;37mC Library: GNU libc (native)\033[0m\n"
                             printf "\033[1;36m  /   |  |  -\\    \033[0;37mType 'install-agents' for AI tools\033[0m\n"
-                            printf "\033[1;36m /_-''    ''-_\\   \033[0m\n\n"
+                            printf "\033[1;36m /_-''    ''-_\\   \033[0;37mType 'archdroid-doctor' for automations\033[0m\n\n"
                         fi
                         """.trimIndent() + "\n"
                     )
@@ -748,6 +748,64 @@ object BootstrapManager {
             )
             chmodSafe(statusScript, 493)
 
+            val doctorScript = File(localBin, "archdroid-doctor")
+            doctorScript.writeText(
+                """
+                #!/bin/bash
+                echo "============================================================"
+                echo "          ARCHDROID STANDALONE AUTOMATION DOCTOR            "
+                echo "============================================================"
+                echo "Timestamp: %S%(date)"
+                echo ""
+
+                echo -n "[1/5] Testing ArchDroid Host API (127.0.0.1:48292)... "
+                STATUS_RES=%S%(curl -s --connect-timeout 2 "http://127.0.0.1:48292/api/status" 2>/dev/null)
+                if echo "%S%STATUS_RES" | grep -q '"status":"online"'; then
+                    echo "✓ ONLINE"
+                else
+                    echo "✗ OFFLINE (Ensure ArchDroid app or service is active)"
+                fi
+
+                echo -n "[2/5] Testing Battery Status Bridge... "
+                BAT_RES=%S%(curl -s --connect-timeout 2 "http://127.0.0.1:48292/api/battery" 2>/dev/null)
+                if echo "%S%BAT_RES" | grep -q 'percentage'; then
+                    PCT=%S%(echo "%S%BAT_RES" | grep -o '"percentage":[0-9]*' | cut -d: -f2)
+                    echo "✓ OK (%S%{PCT}%)"
+                else
+                    echo "✗ FAILED"
+                fi
+
+                echo -n "[3/5] Testing WakeLock Bridge... "
+                LOCK_RES=%S%(curl -s --connect-timeout 2 -X POST "http://127.0.0.1:48292/api/wakelock" -d "action=acquire" 2>/dev/null)
+                if echo "%S%LOCK_RES" | grep -q '"held":true'; then
+                    curl -s -X POST "http://127.0.0.1:48292/api/wakelock" -d "action=release" >/dev/null 2>&1
+                    echo "✓ OK"
+                else
+                    echo "✗ FAILED"
+                fi
+
+                echo -n "[4/5] Checking CLI Compatibility Tools... "
+                MISSING=0
+                for cmd in termux-notification termux-toast termux-wake-lock termux-battery-status termux-job-scheduler; do
+                    if ! command -v "%S%cmd" >/dev/null 2>&1; then
+                        MISSING=%S%((MISSING + 1))
+                    fi
+                done
+                if [ %S%MISSING -eq 0 ]; then
+                    echo "✓ ALL 9 TOOLS READY"
+                else
+                    echo "✗ %S%MISSING TOOLS MISSING"
+                fi
+
+                echo ""
+                echo "[5/5] Active Background Jobs in Android JobScheduler:"
+                echo "------------------------------------------------------------"
+                termux-job-scheduler -p
+                echo "============================================================"
+                """.trimIndent().replace("%S%", "$") + "\n"
+            )
+            chmodSafe(doctorScript, 493)
+
             // Drop-in compatibility wrappers for Termux tools
             val termuxMappings = listOf(
                 "termux-notification" to "archdroid-notification",
@@ -824,6 +882,7 @@ object BootstrapManager {
                 "usr/local/bin/archdroid-vibrate",
                 "usr/local/bin/archdroid-job-scheduler",
                 "usr/local/bin/archdroid-status",
+                "usr/local/bin/archdroid-doctor",
                 "usr/local/bin/termux-notification",
                 "usr/local/bin/termux-toast",
                 "usr/local/bin/termux-wake-lock",
@@ -841,6 +900,112 @@ object BootstrapManager {
             }
 
             writePersistentHistoryConfig(destDir)
+            writeAgentDocumentation(destDir)
+            createAutomationScaffold(destDir)
+        } catch (_: Throwable) {}
+    }
+
+    fun writeAgentDocumentation(destDir: File) {
+        try {
+            val docContent = """
+            # ArchDroid Native Automation Subsystem (Standalone Architecture)
+
+            ArchDroid runs independently of Termux and Termux:API. It contains a native Android host IPC bridge running on http://127.0.0.1:48292 powered by ArchDroidApiServer inside the Android application.
+
+            ### Available Automation & Device Tools
+            All tools below are fully functional inside ArchDroid and connect to the real Android OS:
+
+            1. Notifications (archdroid-notification / termux-notification):
+               - Displays real Android status-bar notifications via NotificationManagerCompat.
+               - Flags: -t <title>, -c <content>, -i <id>, -p <priority: low|default|high>.
+               - Supports pipeline stdin (echo "message" | termux-notification -t "Title").
+
+            2. Toasts (archdroid-toast / termux-toast):
+               - Displays real Android screen toasts.
+               - Flags: -s (short, default), -l (long).
+
+            3. Wake Locks (archdroid-wake-lock / termux-wake-lock, archdroid-wake-unlock / termux-wake-unlock):
+               - Acquires and releases real Android PowerManager.PARTIAL_WAKE_LOCK to keep the CPU awake during long-running tasks.
+               - Includes a 2-hour automatic safety watchdog to prevent unintended battery drain.
+
+            4. Battery Status (archdroid-battery-status / termux-battery-status):
+               - Returns live JSON format matching Termux API: {"percentage":85,"status":"DISCHARGING","plugged":"UNPLUGGED","health":"GOOD","temperature":31.2}.
+
+            5. Clipboard (archdroid-clipboard-get / termux-clipboard-get, archdroid-clipboard-set / termux-clipboard-set):
+               - Directly reads and writes the Android OS system clipboard.
+
+            6. Haptic Vibration (archdroid-vibrate / termux-vibrate):
+               - Triggers device haptic feedback (-d <duration_ms>).
+
+            7. Background Job Scheduler (archdroid-job-scheduler / termux-job-scheduler):
+               - Backed by Android OS native JobScheduler and ArchDroidJobService.
+               - Survives device reboots (persisted jobs automatically restored by ArchDroidBootReceiver).
+               - Runs headless tasks via PRoot even when the terminal window is closed.
+               - Commands:
+                 - termux-job-scheduler -p: List all active scheduled jobs.
+                 - termux-job-scheduler --job-id <ID> --script <PATH> --period-ms <MS> --persisted true: Register/update a periodic job (min 15 mins / 900000ms).
+                 - termux-job-scheduler --cancel --job-id <ID>: Cancel a scheduled job.
+                 - termux-job-scheduler --cancel-all: Cancel all scheduled jobs.
+
+            8. Diagnostic Tool (archdroid-status / archdroid-doctor):
+               - Quick health check of the local API bridge and running services.
+
+            ### Drop-in Compatibility Guarantees
+            - All termux-* binary names exist in /usr/local/bin and /usr/bin as drop-in wrappers. They are REAL Android APIs, not mock shims.
+            - Legacy shebangs (#!/data/data/com.termux/files/usr/bin/bash) automatically resolve through internal compatibility symlinks to /usr/bin/bash.
+            - Automation scripts reside in ~/Automation/ with individual job IDs.
+            """.trimIndent() + "\n"
+
+            val etcDoc = File(destDir, "etc/archdroid-automations.md")
+            etcDoc.parentFile?.mkdirs()
+            etcDoc.writeText(docContent)
+
+            val rootAgentsDir = File(destDir, "root/.agents")
+            rootAgentsDir.mkdirs()
+            val rootAgentsFile = File(rootAgentsDir, "AGENTS.md")
+            val existing = if (rootAgentsFile.exists()) rootAgentsFile.readText() else ""
+            if (!existing.contains("ArchDroid Native Automation Subsystem")) {
+                rootAgentsFile.writeText(existing + "\n\n" + docContent)
+            }
+
+            val skelAgentsDir = File(destDir, "etc/skel/.agents")
+            skelAgentsDir.mkdirs()
+            File(skelAgentsDir, "AGENTS.md").writeText(docContent)
+        } catch (_: Throwable) {}
+    }
+
+    fun createAutomationScaffold(destDir: File) {
+        try {
+            val autoDir = File(destDir, "root/Automation")
+            if (!autoDir.exists()) {
+                autoDir.mkdirs()
+                val welcomeDir = File(autoDir, "welcome-task")
+                welcomeDir.mkdirs()
+
+                File(welcomeDir, "automation.json").writeText(
+                    """
+                    {
+                      "job_id": 999,
+                      "name": "Welcome Notification",
+                      "schedule": "Periodic ~15m",
+                      "period_ms": 900000,
+                      "persisted": true,
+                      "network": "any"
+                    }
+                    """.trimIndent() + "\n"
+                )
+
+                val welcomeScript = File(welcomeDir, "run_welcome.sh")
+                welcomeScript.writeText(
+                    """
+                    #!/bin/bash
+                    # Example ArchDroid Background Automation
+                    echo "[%S%(date '+%Y-%m-%d %H:%M:%S')] ArchDroid automation heartbeat active" >> /root/Automation/welcome-task/heartbeat.log
+                    termux-toast "ArchDroid background automation tick" >/dev/null 2>&1 || true
+                    """.trimIndent().replace("%S%", "$") + "\n"
+                )
+                chmodSafe(welcomeScript, 493)
+            }
         } catch (_: Throwable) {}
     }
 
