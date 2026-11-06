@@ -42,19 +42,25 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsBackupRestore
@@ -63,6 +69,7 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WbSunny
+import android.widget.Toast
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -156,6 +163,24 @@ class MainActivity : ComponentActivity() {
     private var contextMenuTabIndex by mutableStateOf<Int?>(null)
     private var lastTabTapTime = 0L
     private var lastTabTapIndex = -1
+
+    private var showAutomationsDialog by mutableStateOf(false)
+    private var automationsList by mutableStateOf<List<AutomationItem>>(emptyList())
+    private var selectedLogJobId by mutableStateOf<Int?>(null)
+    private var selectedLogTitle by mutableStateOf("")
+    private var currentLogContent by mutableStateOf("")
+    private var showLogDialog by mutableStateOf(false)
+
+    private fun refreshAutomations() {
+        automationsList = ArchDroidAutomationManager.getAllAutomations(this)
+    }
+
+    private fun showJobLogs(item: AutomationItem) {
+        selectedLogJobId = item.id
+        selectedLogTitle = item.name
+        currentLogContent = ArchDroidAutomationManager.readRecentLogs(this, item.id)
+        showLogDialog = true
+    }
 
     private fun triggerBellFeedback() {
         if (!bellHapticEnabled) return
@@ -707,6 +732,12 @@ class MainActivity : ComponentActivity() {
                     if (showRestoreConfirmDialog) {
                         RestoreConfirmationDialog()
                     }
+                    if (showAutomationsDialog) {
+                        AutomationsDashboardDialog()
+                    }
+                    if (showLogDialog) {
+                        AutomationLogDialog()
+                    }
                 }
             }
         }
@@ -1239,6 +1270,28 @@ class MainActivity : ComponentActivity() {
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
+
+                // Automations Dashboard Button
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(if (showAutomationsDialog) currentTheme.tabActiveColor else currentTheme.tabInactiveColor)
+                        .clickable {
+                            refreshAutomations()
+                            showAutomationsDialog = true
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bolt,
+                        contentDescription = "Automations",
+                        tint = if (showAutomationsDialog) Color.White else currentTheme.fgColor,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
 
                 // Settings Gear Button (Option A: Cleanest single icon)
                 Box(
@@ -2580,6 +2633,370 @@ class MainActivity : ComponentActivity() {
                     TextButton(onClick = { showRestoreConfirmDialog = false }) {
                         Text("Cancel", color = currentTheme.fgColor.copy(alpha = 0.7f))
                     }
+                }
+            }
+        )
+    }
+
+    @Composable
+    private fun AutomationsDashboardDialog() {
+        LaunchedEffect(Unit) {
+            refreshAutomations()
+        }
+
+        AlertDialog(
+            onDismissRequest = { showAutomationsDialog = false },
+            containerColor = currentTheme.topBarColor,
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bolt,
+                            contentDescription = null,
+                            tint = Color(0xFF58A6FF),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Automations & Jobs",
+                                color = currentTheme.fgColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "Android JobScheduler • Survives deep sleep",
+                                color = currentTheme.fgColor.copy(alpha = 0.65f),
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                    IconButton(onClick = { refreshAutomations() }) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = currentTheme.fgColor
+                        )
+                    }
+                }
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Header Status Summary Card
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(currentTheme.tabInactiveColor)
+                            .padding(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Scheduled Tasks: ${automationsList.count { it.persisted }} active",
+                                    color = Color(0xFF7EE787),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    text = "IPC Bridge: 127.0.0.1:48292",
+                                    color = currentTheme.fgColor.copy(alpha = 0.7f),
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                            Button(
+                                onClick = {
+                                    ArchDroidScheduler.rescheduleAllPersisted(this@MainActivity)
+                                    refreshAutomations()
+                                    Toast.makeText(this@MainActivity, "Persisted jobs rescheduled in OS", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1F6FEB)),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Text("Reschedule", fontSize = 10.sp, color = Color.White)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Scrollable List of Automations
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 420.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(automationsList) { item ->
+                            val isRunning = ArchDroidAutomationManager.runningJobIds.contains(item.id)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(currentTheme.bgColor)
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isRunning) Color(0xFF58A6FF) else Color(0xFF30363D),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(10.dp)
+                            ) {
+                                Column {
+                                    // Row 1: ID, Name, Status Badge
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(Color(0xFF1F6FEB).copy(alpha = 0.25f))
+                                                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = "#${item.id}",
+                                                    color = Color(0xFF58A6FF),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = FontFamily.Monospace
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = item.name,
+                                                color = currentTheme.fgColor,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+
+                                        // Status badge
+                                        if (isRunning) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(Color(0xFFD29922).copy(alpha = 0.25f))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = "⚡ RUNNING",
+                                                    color = Color(0xFFE3B341),
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        } else {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(
+                                                        if (item.persisted) Color(0xFF238636).copy(alpha = 0.2f)
+                                                        else Color(0xFF8B949E).copy(alpha = 0.2f)
+                                                    )
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (item.persisted) "SCHEDULED" else "INACTIVE",
+                                                    color = if (item.persisted) Color(0xFF7EE787) else Color(0xFF8B949E),
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    // Row 2: Schedule & Last Run
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = item.schedule,
+                                            color = currentTheme.fgColor.copy(alpha = 0.75f),
+                                            fontSize = 11.sp
+                                        )
+                                        Text(
+                                            text = "Last: ${item.lastRun}",
+                                            color = Color(0xFF58A6FF),
+                                            fontSize = 10.sp,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Row 3: Action Buttons
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // View Logs
+                                        OutlinedButton(
+                                            onClick = { showJobLogs(item) },
+                                            modifier = Modifier.height(28.dp),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = currentTheme.fgColor)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Description,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Logs", fontSize = 11.sp)
+                                        }
+
+                                        Spacer(modifier = Modifier.width(6.dp))
+
+                                        // Run Force
+                                        Button(
+                                            onClick = {
+                                                ArchDroidAutomationManager.executeAutomation(
+                                                    this@MainActivity,
+                                                    item,
+                                                    force = true
+                                                ) {
+                                                    refreshAutomations()
+                                                }
+                                                refreshAutomations()
+                                            },
+                                            enabled = !isRunning,
+                                            modifier = Modifier.height(28.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636))
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.PlayArrow,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(if (isRunning) "Running..." else "Run", fontSize = 11.sp, color = Color.White)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showAutomationsDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabActiveColor)
+                ) {
+                    Text("Done", color = Color.White)
+                }
+            }
+        )
+    }
+
+    @Composable
+    private fun AutomationLogDialog() {
+        AlertDialog(
+            onDismissRequest = { showLogDialog = false },
+            containerColor = currentTheme.topBarColor,
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Logs: $selectedLogTitle (#$selectedLogJobId)",
+                        color = currentTheme.fgColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = {
+                            selectedLogJobId?.let {
+                                currentLogContent = ArchDroidAutomationManager.readRecentLogs(this@MainActivity, it)
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh Log",
+                            tint = currentTheme.fgColor
+                        )
+                    }
+                }
+            },
+            text = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF0D1117))
+                        .border(1.dp, Color(0xFF30363D), RoundedCornerShape(8.dp))
+                        .padding(10.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = currentLogContent,
+                            color = Color(0xFFE6EDF3),
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("Job Logs", currentLogContent))
+                        Toast.makeText(this@MainActivity, "Logs copied to clipboard", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1F6FEB))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Copy", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogDialog = false }) {
+                    Text("Close", color = currentTheme.fgColor.copy(alpha = 0.7f))
                 }
             }
         )

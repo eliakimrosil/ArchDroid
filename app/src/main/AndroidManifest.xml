@@ -48,6 +48,44 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ArchDroidWidgetConfigureActivity"
+            android:exported="true"
+            android:theme="@style/Theme.ArchDroid">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- 1-Tap Single Automation Task Widget -->
+        <receiver
+            android:name=".ArchDroidTaskWidgetProvider"
+            android:exported="true"
+            android:label="ArchDroid Task Button">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.archdroid.ACTION_WIDGET_EXECUTE_TASK" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/archdroid_task_widget_info" />
+        </receiver>
+
+        <!-- Multi-Task Automation Dashboard Widget -->
+        <receiver
+            android:name=".ArchDroidDashboardWidgetProvider"
+            android:exported="true"
+            android:label="ArchDroid Automations">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.archdroid.ACTION_DASH_EXECUTE_TASK" />
+                <action android:name="com.archdroid.ACTION_DASH_REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/archdroid_dashboard_widget_info" />
+        </receiver>
+
         <service
             android:name=".TerminalForegroundService"
             android:enabled="true"
