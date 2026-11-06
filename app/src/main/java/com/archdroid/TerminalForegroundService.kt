@@ -24,6 +24,7 @@ class TerminalForegroundService : Service() {
             createNotificationChannel()
             startForeground(NOTIFICATION_ID, buildNotification())
             acquireLocks()
+            ArchDroidApiServer.start(this)
         } catch (_: Throwable) {}
     }
 
@@ -42,6 +43,7 @@ class TerminalForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        ArchDroidApiServer.stop()
         instance = null
         releaseLocks()
         super.onDestroy()

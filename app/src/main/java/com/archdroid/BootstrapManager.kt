@@ -213,6 +213,7 @@ object BootstrapManager {
         } catch (_: Throwable) {}
 
         writePersistentHistoryConfig(rootfsDir)
+        updateScriptsIfBootstrapped(context, rootfsDir)
 
         File(rootfsDir, ".bootstrap_version").writeText(BOOTSTRAP_VERSION)
         onProgress(
@@ -527,6 +528,278 @@ object BootstrapManager {
             )
             chmodSafe(restoreScript, 493)
 
+            // Native ArchDroid automation CLI tools
+            val localBin = File(destDir, "usr/local/bin")
+            localBin.mkdirs()
+
+            val notifyScript = File(localBin, "archdroid-notification")
+            notifyScript.writeText(
+                """
+                #!/bin/bash
+                TITLE="ArchDroid"
+                CONTENT=""
+                ID=""
+                PRIORITY="default"
+
+                while [ %S%# -gt 0 ]; do
+                    case "%S%1" in
+                        -t|--title) TITLE="%S%2"; shift 2 ;;
+                        -c|--content) CONTENT="%S%2"; shift 2 ;;
+                        -i|--id) ID="%S%2"; shift 2 ;;
+                        -p|--priority) PRIORITY="%S%2"; shift 2 ;;
+                        *)
+                            if [ -z "%S%CONTENT" ]; then
+                                CONTENT="%S%1"
+                            fi
+                            shift
+                            ;;
+                    esac
+                done
+
+                if [ -z "%S%CONTENT" ] && [ ! -t 0 ]; then
+                    CONTENT="%S%(cat)"
+                fi
+
+                if [ -z "%S%CONTENT" ]; then
+                    CONTENT="%S%TITLE"
+                fi
+
+                curl -s -X POST "http://127.0.0.1:48292/api/notify" \
+                    --data-urlencode "title=%S%TITLE" \
+                    --data-urlencode "content=%S%CONTENT" \
+                    --data-urlencode "id=%S%ID" \
+                    --data-urlencode "priority=%S%PRIORITY" >/dev/null 2>&1 || true
+                """.trimIndent().replace("%S%", "$") + "\n"
+            )
+            chmodSafe(notifyScript, 493)
+
+            val toastScript = File(localBin, "archdroid-toast")
+            toastScript.writeText(
+                """
+                #!/bin/bash
+                IS_LONG=false
+                MSG=""
+
+                while [ %S%# -gt 0 ]; do
+                    case "%S%1" in
+                        -s|--short) IS_LONG=false; shift ;;
+                        -l|--long) IS_LONG=true; shift ;;
+                        -b|-g) shift 2 ;;
+                        *)
+                            if [ -z "%S%MSG" ]; then
+                                MSG="%S%1"
+                            else
+                                MSG="%S%MSG %S%1"
+                            fi
+                            shift
+                            ;;
+                    esac
+                done
+
+                if [ -z "%S%MSG" ] && [ ! -t 0 ]; then
+                    MSG="%S%(cat)"
+                fi
+
+                if [ -z "%S%MSG" ]; then
+                    exit 0
+                fi
+
+                curl -s -X POST "http://127.0.0.1:48292/api/toast" \
+                    --data-urlencode "message=%S%MSG" \
+                    --data-urlencode "long=%S%IS_LONG" >/dev/null 2>&1 || true
+                """.trimIndent().replace("%S%", "$") + "\n"
+            )
+            chmodSafe(toastScript, 493)
+
+            val wakeLockScript = File(localBin, "archdroid-wake-lock")
+            wakeLockScript.writeText(
+                """
+                #!/bin/bash
+                curl -s -X POST "http://127.0.0.1:48292/api/wakelock" -d "action=acquire" >/dev/null 2>&1 || true
+                """.trimIndent() + "\n"
+            )
+            chmodSafe(wakeLockScript, 493)
+
+            val wakeUnlockScript = File(localBin, "archdroid-wake-unlock")
+            wakeUnlockScript.writeText(
+                """
+                #!/bin/bash
+                curl -s -X POST "http://127.0.0.1:48292/api/wakelock" -d "action=release" >/dev/null 2>&1 || true
+                """.trimIndent() + "\n"
+            )
+            chmodSafe(wakeUnlockScript, 493)
+
+            val batteryScript = File(localBin, "archdroid-battery-status")
+            batteryScript.writeText(
+                """
+                #!/bin/bash
+                curl -s "http://127.0.0.1:48292/api/battery" 2>/dev/null || echo '{"percentage":100,"status":"DISCHARGING","plugged":"UNPLUGGED","health":"GOOD","temperature":25.0}'
+                """.trimIndent() + "\n"
+            )
+            chmodSafe(batteryScript, 493)
+
+            val clipGetScript = File(localBin, "archdroid-clipboard-get")
+            clipGetScript.writeText(
+                """
+                #!/bin/bash
+                curl -s "http://127.0.0.1:48292/api/clipboard?format=raw" 2>/dev/null
+                """.trimIndent() + "\n"
+            )
+            chmodSafe(clipGetScript, 493)
+
+            val clipSetScript = File(localBin, "archdroid-clipboard-set")
+            clipSetScript.writeText(
+                """
+                #!/bin/bash
+                TEXT=""
+                if [ %S%# -gt 0 ]; then
+                    TEXT="%S%*"
+                elif [ ! -t 0 ]; then
+                    TEXT="%S%(cat)"
+                fi
+
+                curl -s -X POST "http://127.0.0.1:48292/api/clipboard" \
+                    --data-urlencode "text=%S%TEXT" >/dev/null 2>&1 || true
+                """.trimIndent().replace("%S%", "$") + "\n"
+            )
+            chmodSafe(clipSetScript, 493)
+
+            val vibrateScript = File(localBin, "archdroid-vibrate")
+            vibrateScript.writeText(
+                """
+                #!/bin/bash
+                DUR=200
+                while [ %S%# -gt 0 ]; do
+                    case "%S%1" in
+                        -d|--duration) DUR="%S%2"; shift 2 ;;
+                        *) DUR="%S%1"; shift ;;
+                    esac
+                done
+
+                curl -s -X POST "http://127.0.0.1:48292/api/vibrate" -d "duration=%S%DUR" >/dev/null 2>&1 || true
+                """.trimIndent().replace("%S%", "$") + "\n"
+            )
+            chmodSafe(vibrateScript, 493)
+
+            val jobSchedScript = File(localBin, "archdroid-job-scheduler")
+            jobSchedScript.writeText(
+                """
+                #!/bin/bash
+                OPT_SCRIPT=""
+                OPT_JOB_ID=""
+                OPT_PENDING=false
+                OPT_CANCEL=false
+                OPT_CANCEL_ALL=false
+                OPT_PERIOD_MS=900000
+                OPT_NETWORK="any"
+                OPT_PERSISTED="true"
+
+                while [ %S%# -gt 0 ]; do
+                    case "%S%1" in
+                        -p|--pending) OPT_PENDING=true; shift ;;
+                        --cancel) OPT_CANCEL=true; shift ;;
+                        --cancel-all) OPT_CANCEL_ALL=true; shift ;;
+                        -s|--script) OPT_SCRIPT="%S%2"; shift 2 ;;
+                        --job-id) OPT_JOB_ID="%S%2"; shift 2 ;;
+                        --period-ms) OPT_PERIOD_MS="%S%2"; shift 2 ;;
+                        --network) OPT_NETWORK="%S%2"; shift 2 ;;
+                        --persisted) OPT_PERSISTED="%S%2"; shift 2 ;;
+                        --battery-not-low|--storage-not-low|--charging) shift 2 ;;
+                        *) shift ;;
+                    esac
+                done
+
+                if [ "%S%OPT_PENDING" = true ]; then
+                    curl -s "http://127.0.0.1:48292/api/jobs?action=list&format=text" 2>/dev/null
+                    exit 0
+                fi
+
+                if [ "%S%OPT_CANCEL_ALL" = true ]; then
+                    curl -s -X POST "http://127.0.0.1:48292/api/jobs" -d "action=cancel_all" >/dev/null 2>&1
+                    exit 0
+                fi
+
+                if [ "%S%OPT_CANCEL" = true ] && [ -n "%S%OPT_JOB_ID" ]; then
+                    curl -s -X POST "http://127.0.0.1:48292/api/jobs" -d "action=cancel" -d "job_id=%S%OPT_JOB_ID" >/dev/null 2>&1
+                    exit 0
+                fi
+
+                if [ -n "%S%OPT_JOB_ID" ] && [ -n "%S%OPT_SCRIPT" ]; then
+                    curl -s -X POST "http://127.0.0.1:48292/api/jobs" \
+                        -d "action=add" \
+                        -d "job_id=%S%OPT_JOB_ID" \
+                        --data-urlencode "script=%S%OPT_SCRIPT" \
+                        -d "period_ms=%S%OPT_PERIOD_MS" \
+                        -d "network=%S%OPT_NETWORK" \
+                        -d "persisted=%S%OPT_PERSISTED" >/dev/null 2>&1
+                    exit 0
+                fi
+                """.trimIndent().replace("%S%", "$") + "\n"
+            )
+            chmodSafe(jobSchedScript, 493)
+
+            val statusScript = File(localBin, "archdroid-status")
+            statusScript.writeText(
+                """
+                #!/bin/bash
+                curl -s "http://127.0.0.1:48292/api/status" 2>/dev/null || echo '{"status":"offline","error":"ArchDroidApiServer not reachable"}'
+                echo ""
+                """.trimIndent() + "\n"
+            )
+            chmodSafe(statusScript, 493)
+
+            // Drop-in compatibility wrappers for Termux tools
+            val termuxMappings = listOf(
+                "termux-notification" to "archdroid-notification",
+                "termux-toast" to "archdroid-toast",
+                "termux-wake-lock" to "archdroid-wake-lock",
+                "termux-wake-unlock" to "archdroid-wake-unlock",
+                "termux-battery-status" to "archdroid-battery-status",
+                "termux-clipboard-get" to "archdroid-clipboard-get",
+                "termux-clipboard-set" to "archdroid-clipboard-set",
+                "termux-vibrate" to "archdroid-vibrate",
+                "termux-job-scheduler" to "archdroid-job-scheduler"
+            )
+
+            termuxMappings.forEach { (tName, aName) ->
+                val wrapFile = File(localBin, tName)
+                wrapFile.writeText(
+                    """
+                    #!/bin/bash
+                    exec /usr/local/bin/$aName "%S%@"
+                    """.trimIndent().replace("%S%", "$") + "\n"
+                )
+                chmodSafe(wrapFile, 493)
+
+                // Also ensure symlink in /usr/bin for scripts expecting it in /usr/bin
+                val usrBinFile = File(destDir, "usr/bin/$tName")
+                if (!usrBinFile.exists()) {
+                    try {
+                        Os.symlink("/usr/local/bin/$tName", usrBinFile.absolutePath)
+                    } catch (_: Throwable) {}
+                }
+            }
+
+            // Compatibility shebangs and legacy paths for Termux scripts
+            try {
+                val termuxUsrDir = File(destDir, "data/data/com.termux/files/usr")
+                termuxUsrDir.mkdirs()
+                val termuxBinLink = File(termuxUsrDir, "bin")
+                if (!termuxBinLink.exists()) {
+                    try {
+                        Os.symlink("/usr/bin", termuxBinLink.absolutePath)
+                    } catch (_: Throwable) {}
+                }
+
+                val termuxFilesDir = File(destDir, "data/data/com.termux/files")
+                val termuxHomeLink = File(termuxFilesDir, "home")
+                if (!termuxHomeLink.exists()) {
+                    try {
+                        Os.symlink("/root", termuxHomeLink.absolutePath)
+                    } catch (_: Throwable) {}
+                }
+            } catch (_: Throwable) {}
+
             // Ensure executable permissions on all critical binaries across reboots
             listOf(
                 "bin/sh",
@@ -540,7 +813,26 @@ object BootstrapManager {
                 "usr/local/bin/poweroff",
                 "usr/local/bin/shutdown",
                 "usr/local/bin/archdroid-backup",
-                "usr/local/bin/archdroid-restore"
+                "usr/local/bin/archdroid-restore",
+                "usr/local/bin/archdroid-notification",
+                "usr/local/bin/archdroid-toast",
+                "usr/local/bin/archdroid-wake-lock",
+                "usr/local/bin/archdroid-wake-unlock",
+                "usr/local/bin/archdroid-battery-status",
+                "usr/local/bin/archdroid-clipboard-get",
+                "usr/local/bin/archdroid-clipboard-set",
+                "usr/local/bin/archdroid-vibrate",
+                "usr/local/bin/archdroid-job-scheduler",
+                "usr/local/bin/archdroid-status",
+                "usr/local/bin/termux-notification",
+                "usr/local/bin/termux-toast",
+                "usr/local/bin/termux-wake-lock",
+                "usr/local/bin/termux-wake-unlock",
+                "usr/local/bin/termux-battery-status",
+                "usr/local/bin/termux-clipboard-get",
+                "usr/local/bin/termux-clipboard-set",
+                "usr/local/bin/termux-vibrate",
+                "usr/local/bin/termux-job-scheduler"
             ).forEach { relPath ->
                 val f = File(destDir, relPath)
                 if (f.exists()) {

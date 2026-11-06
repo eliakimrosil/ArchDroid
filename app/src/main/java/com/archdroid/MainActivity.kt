@@ -675,6 +675,7 @@ class MainActivity : ComponentActivity() {
         } catch (_: Throwable) {}
 
         startForegroundServiceSafe()
+        ArchDroidApiServer.start(this)
         startBootstrap()
 
         setContent {
