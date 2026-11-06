@@ -168,6 +168,7 @@ class MainActivity : ComponentActivity() {
     private var automationsList by mutableStateOf<List<AutomationItem>>(emptyList())
     private var selectedLogJobId by mutableStateOf<Int?>(null)
     private var selectedLogTitle by mutableStateOf("")
+    private var selectedLogScript by mutableStateOf("")
     private var currentLogContent by mutableStateOf("")
     private var showLogDialog by mutableStateOf(false)
 
@@ -178,7 +179,8 @@ class MainActivity : ComponentActivity() {
     private fun showJobLogs(item: AutomationItem) {
         selectedLogJobId = item.id
         selectedLogTitle = item.name
-        currentLogContent = ArchDroidAutomationManager.readRecentLogs(this, item.id)
+        selectedLogScript = item.script
+        currentLogContent = ArchDroidAutomationManager.readRecentLogs(this, item.id, item.script)
         showLogDialog = true
     }
 
@@ -2939,7 +2941,7 @@ class MainActivity : ComponentActivity() {
                     IconButton(
                         onClick = {
                             selectedLogJobId?.let {
-                                currentLogContent = ArchDroidAutomationManager.readRecentLogs(this@MainActivity, it)
+                                currentLogContent = ArchDroidAutomationManager.readRecentLogs(this@MainActivity, it, selectedLogScript)
                             }
                         }
                     ) {

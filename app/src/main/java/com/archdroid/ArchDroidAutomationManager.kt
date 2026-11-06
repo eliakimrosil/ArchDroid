@@ -186,11 +186,19 @@ object ArchDroidAutomationManager {
         }
 
         scope.launch {
-            val cleanScript = item.script.trim()
-            val execCmd = if (force && !cleanScript.contains("--force")) {
-                "$cleanScript --force"
+            val rawScript = item.script.trim()
+            val quotedScript = if (rawScript.startsWith("\"") || rawScript.startsWith("'")) {
+                rawScript
+            } else if (rawScript.contains(" ")) {
+                "\"$rawScript\""
             } else {
-                cleanScript
+                rawScript
+            }
+
+            val execCmd = if (force && !quotedScript.contains("--force")) {
+                "$quotedScript --force"
+            } else {
+                quotedScript
             }
 
             val exitCode = try {
@@ -214,18 +222,54 @@ object ArchDroidAutomationManager {
         }
     }
 
-    fun readRecentLogs(context: Context, jobId: Int, maxLines: Int = 120): String {
-        val logFile = File(context.filesDir, "job_logs/job_${jobId}.log")
-        if (!logFile.exists() || logFile.length() == 0L) {
-            return "No output logged yet for Job $jobId.\nRun the job to see live output."
+    fun readRecentLogs(context: Context, jobId: Int, scriptPath: String? = null, maxLines: Int = 120): String {
+        val rootfsDir = BootstrapManager.getRootfsDir(context)
+        val jobLogFile = File(context.filesDir, "job_logs/job_${jobId}.log")
+
+        var scriptLogContent = ""
+        if (!scriptPath.isNullOrBlank()) {
+            try {
+                val cleanScript = scriptPath.trim().removeSurrounding("\"").removeSurrounding("'")
+                val scriptFileInRootfs = File(rootfsDir, cleanScript.removePrefix("/"))
+                val folder = scriptFileInRootfs.parentFile
+                if (folder != null && folder.exists()) {
+                    val candidateLogs = folder.listFiles { file ->
+                        file.isFile && file.name.endsWith(".log")
+                    }?.toMutableList() ?: mutableListOf()
+
+                    val subLogsDir = File(folder, "logs")
+                    if (subLogsDir.exists() && subLogsDir.isDirectory) {
+                        subLogsDir.listFiles { file ->
+                            file.isFile && file.name.endsWith(".log")
+                        }?.let { candidateLogs.addAll(it) }
+                    }
+
+                    // Pick the most recently modified log file
+                    val bestLog = candidateLogs.maxByOrNull { it.lastModified() }
+                    if (bestLog != null && bestLog.length() > 0L) {
+                        val lines = bestLog.readLines()
+                        val start = (lines.size - maxLines).coerceAtLeast(0)
+                        scriptLogContent = lines.subList(start, lines.size).joinToString("\n")
+                    }
+                }
+            } catch (_: Throwable) {}
         }
 
-        return try {
-            val lines = logFile.readLines()
-            val start = (lines.size - maxLines).coerceAtLeast(0)
-            lines.subList(start, lines.size).joinToString("\n")
-        } catch (e: Throwable) {
-            "Error reading log: ${e.message}"
+        val jobLogContent = try {
+            if (jobLogFile.exists() && jobLogFile.length() > 0L) {
+                val lines = jobLogFile.readLines()
+                val start = (lines.size - maxLines).coerceAtLeast(0)
+                lines.subList(start, lines.size).joinToString("\n")
+            } else ""
+        } catch (_: Throwable) { "" }
+
+        return when {
+            scriptLogContent.isNotEmpty() && jobLogContent.isNotEmpty() -> {
+                "$scriptLogContent\n\n--- System Runner Output ---\n$jobLogContent"
+            }
+            scriptLogContent.isNotEmpty() -> scriptLogContent
+            jobLogContent.isNotEmpty() -> jobLogContent
+            else -> "No output logged yet for Job $jobId.\nRun the job to see live output."
         }
     }
 

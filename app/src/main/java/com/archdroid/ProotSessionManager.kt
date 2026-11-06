@@ -161,11 +161,7 @@ object ProotSessionManager {
         }
 
         val cleanScript = scriptPath.trim()
-        val execCmd = if (cleanScript.contains(" ") && !cleanScript.startsWith("\"") && !cleanScript.contains("'")) {
-            "\"$cleanScript\""
-        } else {
-            cleanScript
-        }
+        val execCmd = formatCommandForShell(rootfsDir, cleanScript)
 
         val argsList = mutableListOf(
             prootBin,
@@ -241,5 +237,47 @@ object ProotSessionManager {
         } catch (_: Throwable) {
             -1
         }
+    }
+
+    fun formatCommandForShell(rootfsDir: File, command: String): String {
+        val trimmed = command.trim()
+        if (trimmed.isEmpty()) return trimmed
+
+        // Already quoted at start
+        if (trimmed.startsWith("\"") || trimmed.startsWith("'")) {
+            return trimmed
+        }
+
+        // If the entire string is an exact file path inside rootfs
+        val directFile = File(rootfsDir, trimmed.removePrefix("/"))
+        if (directFile.isFile) {
+            return if (trimmed.contains(" ")) "\"$trimmed\"" else trimmed
+        }
+
+        // If it starts with a path '/' and contains spaces/arguments,
+        // find the executable file prefix by scanning backwards over spaces
+        if (trimmed.startsWith("/")) {
+            var spaceIdx = trimmed.lastIndexOf(' ')
+            while (spaceIdx > 0) {
+                val candidatePath = trimmed.substring(0, spaceIdx).trim()
+                val candidateFile = File(rootfsDir, candidatePath.removePrefix("/"))
+                if (candidateFile.isFile) {
+                    val args = trimmed.substring(spaceIdx + 1).trim()
+                    val quoted = if (candidatePath.contains(" ")) "\"$candidatePath\"" else candidatePath
+                    return "$quoted $args"
+                }
+                spaceIdx = trimmed.lastIndexOf(' ', spaceIdx - 1)
+            }
+        }
+
+        // Fallback for simple paths with spaces and no shell operators
+        if (trimmed.startsWith("/") && trimmed.contains(" ") &&
+            !trimmed.contains("&&") && !trimmed.contains("||") &&
+            !trimmed.contains(";") && !trimmed.contains("|")
+        ) {
+            return "\"$trimmed\""
+        }
+
+        return trimmed
     }
 }
