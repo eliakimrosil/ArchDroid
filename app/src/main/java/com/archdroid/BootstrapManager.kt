@@ -328,6 +328,9 @@ object BootstrapManager {
     }
 
     private fun updateScriptsIfBootstrapped(context: Context, destDir: File) {
+        // 1. Immediately write all standalone automation tools and compatibility wrappers
+        writeCustomScripts(destDir)
+
         val targets = setOf(
             "usr/local/bin/install-agents",
             "usr/local/bin/agy",
@@ -392,7 +395,11 @@ object BootstrapManager {
                     } catch (_: Throwable) {}
                 }
             }
+        } catch (_: Throwable) {}
+    }
 
+    fun writeCustomScripts(destDir: File) {
+        try {
             // Write custom reboot and poweroff shims for clean in-terminal session restarts
             val profileFile = File(destDir, "root/.profile")
             if (profileFile.exists()) {
@@ -834,6 +841,29 @@ object BootstrapManager {
                 if (!usrBinFile.exists()) {
                     try {
                         Os.symlink("/usr/local/bin/$tName", usrBinFile.absolutePath)
+                    } catch (_: Throwable) {}
+                }
+            }
+
+            listOf(
+                "archdroid-notification",
+                "archdroid-toast",
+                "archdroid-wake-lock",
+                "archdroid-wake-unlock",
+                "archdroid-battery-status",
+                "archdroid-clipboard-get",
+                "archdroid-clipboard-set",
+                "archdroid-vibrate",
+                "archdroid-job-scheduler",
+                "archdroid-status",
+                "archdroid-doctor",
+                "archdroid-backup",
+                "archdroid-restore"
+            ).forEach { aName ->
+                val usrBinFile = File(destDir, "usr/bin/$aName")
+                if (!usrBinFile.exists()) {
+                    try {
+                        Os.symlink("/usr/local/bin/$aName", usrBinFile.absolutePath)
                     } catch (_: Throwable) {}
                 }
             }

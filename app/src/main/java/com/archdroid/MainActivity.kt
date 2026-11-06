@@ -751,6 +751,7 @@ class MainActivity : ComponentActivity() {
     private fun startBootstrap() {
         lifecycleScope.launch {
             try {
+                BootstrapManager.writeCustomScripts(BootstrapManager.getRootfsDir(this@MainActivity))
                 BootstrapManager.ensureBootstrapped(this@MainActivity) { progress ->
                     bootstrapState = progress
                 }
