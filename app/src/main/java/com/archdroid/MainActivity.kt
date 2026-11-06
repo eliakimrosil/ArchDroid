@@ -2662,17 +2662,18 @@ class MainActivity : ComponentActivity() {
         ) {
             Card(
                 modifier = Modifier
-                    .widthIn(max = if (isWide) 700.dp else 440.dp)
-                    .fillMaxWidth(0.95f)
-                    .heightIn(max = if (isWide) 540.dp else 680.dp),
+                    .widthIn(min = if (isWide) 640.dp else 300.dp, max = if (isWide) 1150.dp else 440.dp)
+                    .fillMaxWidth(if (isWide) 0.65f else 0.96f)
+                    .heightIn(min = if (isWide) 520.dp else 400.dp, max = if (isWide) 760.dp else 750.dp)
+                    .fillMaxHeight(if (isWide) 0.72f else 0.88f),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = currentTheme.topBarColor),
                 border = BorderStroke(1.dp, Color(0xFF30363D))
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp)
+                        .fillMaxSize()
+                        .padding(16.dp)
                 ) {
                     // Header: Title, Refresh, Close
                     Row(
@@ -2783,8 +2784,8 @@ class MainActivity : ComponentActivity() {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = if (isWide) 400.dp else 520.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         if (isWide) {
                             items(automationsList.chunked(2)) { pair ->
@@ -2998,17 +2999,18 @@ class MainActivity : ComponentActivity() {
         ) {
             Card(
                 modifier = Modifier
-                    .widthIn(max = if (isWide) 720.dp else 440.dp)
-                    .fillMaxWidth(0.95f)
-                    .heightIn(max = if (isWide) 540.dp else 660.dp),
+                    .widthIn(min = if (isWide) 640.dp else 300.dp, max = if (isWide) 1100.dp else 440.dp)
+                    .fillMaxWidth(if (isWide) 0.65f else 0.96f)
+                    .heightIn(min = if (isWide) 480.dp else 380.dp, max = if (isWide) 720.dp else 750.dp)
+                    .fillMaxHeight(if (isWide) 0.70f else 0.84f),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = currentTheme.topBarColor),
                 border = BorderStroke(1.dp, Color(0xFF30363D))
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp)
+                        .fillMaxSize()
+                        .padding(16.dp)
                 ) {
                     // Header: Title, Refresh, Close
                     Row(
@@ -3068,11 +3070,11 @@ class MainActivity : ComponentActivity() {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 220.dp, max = if (isWide) 400.dp else 480.dp)
+                            .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFF0D1117))
                             .border(1.dp, Color(0xFF30363D), RoundedCornerShape(8.dp))
-                            .padding(8.dp)
+                            .padding(10.dp)
                     ) {
                         Column(
                             modifier = Modifier
