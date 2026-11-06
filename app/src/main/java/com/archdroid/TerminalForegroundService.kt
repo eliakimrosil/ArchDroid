@@ -25,6 +25,7 @@ class TerminalForegroundService : Service() {
             startForeground(NOTIFICATION_ID, buildNotification())
             acquireLocks()
             ArchDroidApiServer.start(this)
+            ArchDroidScheduler.rescheduleAllPersisted(this)
         } catch (_: Throwable) {}
     }
 

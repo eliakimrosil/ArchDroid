@@ -277,7 +277,7 @@ object ArchDroidApiServer {
                     put("version", "1.0.0")
                     put("wakelock", automationWakeLock?.isHeld == true)
                     put("archdroid_api", true)
-                    put("jobs_count", loadJobs(ctx).length())
+                    put("jobs_count", ArchDroidScheduler.loadJobs(ctx).length())
                 }.toString()
             }
 
@@ -443,26 +443,6 @@ object ArchDroidApiServer {
         } catch (_: Throwable) {}
     }
 
-    private fun getJobsFile(context: Context): java.io.File {
-        return java.io.File(context.filesDir, "archdroid_jobs.json")
-    }
-
-    private fun loadJobs(context: Context): org.json.JSONArray {
-        val f = getJobsFile(context)
-        if (!f.exists()) return org.json.JSONArray()
-        return try {
-            org.json.JSONArray(f.readText())
-        } catch (_: Throwable) {
-            org.json.JSONArray()
-        }
-    }
-
-    private fun saveJobs(context: Context, jobs: org.json.JSONArray) {
-        try {
-            getJobsFile(context).writeText(jobs.toString(2))
-        } catch (_: Throwable) {}
-    }
-
     private fun handleJobsRequest(
         context: Context,
         method: String,
@@ -485,10 +465,10 @@ object ArchDroidApiServer {
         } else params
 
         val action = mergedParams["action"]?.lowercase() ?: if (method == "GET") "list" else "status"
-        val jobs = loadJobs(context)
 
         return when (action) {
             "list", "get", "pending" -> {
+                val jobs = ArchDroidScheduler.loadJobs(context)
                 val format = mergedParams["format"]?.lowercase() ?: "json"
                 if (format == "text") {
                     val sb = StringBuilder()
@@ -497,7 +477,7 @@ object ArchDroidApiServer {
                         val id = job.optInt("id", -1)
                         if (id < 0) continue
                         val script = job.optString("script", "")
-                        val period = job.optLong("period_ms", 900000L)
+                        val period = job.optLong("period_ms", ArchDroidScheduler.MIN_PERIOD_MS)
                         sb.append("Pending Job $id:\n")
                         sb.append("  period: ${period}ms\n")
                         if (script.isNotEmpty()) sb.append("  script: $script\n")
@@ -514,33 +494,27 @@ object ArchDroidApiServer {
             "add", "schedule" -> {
                 val jobId = mergedParams["job_id"]?.toIntOrNull() ?: mergedParams["id"]?.toIntOrNull()
                 val script = mergedParams["script"] ?: ""
-                val periodMs = mergedParams["period_ms"]?.toLongOrNull() ?: 900000L
+                val periodMs = mergedParams["period_ms"]?.toLongOrNull() ?: ArchDroidScheduler.MIN_PERIOD_MS
                 val network = mergedParams["network"] ?: "any"
+                val batteryNotLow = mergedParams["battery_not_low"]?.toBoolean() ?: false
+                val charging = mergedParams["charging"]?.toBoolean() ?: false
                 val persisted = mergedParams["persisted"]?.toBoolean() ?: true
 
                 if (jobId == null) {
                     return 400 to jsonError("Missing job_id")
                 }
 
-                val newArray = org.json.JSONArray()
-                for (i in 0 until jobs.length()) {
-                    val j = jobs.optJSONObject(i) ?: continue
-                    if (j.optInt("id") != jobId) {
-                        newArray.put(j)
-                    }
-                }
-
-                val jobObj = JSONObject().apply {
-                    put("id", jobId)
-                    put("script", script)
-                    put("period_ms", periodMs)
-                    put("network", network)
-                    put("persisted", persisted)
-                    put("created_at", System.currentTimeMillis())
-                }
-                newArray.put(jobObj)
-                saveJobs(context, newArray)
-                200 to JSONObject().put("status", "ok").put("id", jobId).toString()
+                val scheduled = ArchDroidScheduler.scheduleJob(
+                    context,
+                    jobId,
+                    script,
+                    periodMs,
+                    network,
+                    batteryNotLow,
+                    charging,
+                    persisted
+                )
+                200 to JSONObject().put("status", "ok").put("id", jobId).put("scheduled", scheduled).toString()
             }
 
             "cancel", "delete" -> {
@@ -548,23 +522,26 @@ object ArchDroidApiServer {
                 if (jobId == null) {
                     return 400 to jsonError("Missing job_id to cancel")
                 }
-                val newArray = org.json.JSONArray()
-                var removed = false
-                for (i in 0 until jobs.length()) {
-                    val j = jobs.optJSONObject(i) ?: continue
-                    if (j.optInt("id") == jobId) {
-                        removed = true
-                    } else {
-                        newArray.put(j)
-                    }
-                }
-                saveJobs(context, newArray)
+                val removed = ArchDroidScheduler.cancelJob(context, jobId)
                 200 to JSONObject().put("status", "ok").put("cancelled", removed).toString()
             }
 
             "cancel_all", "clear" -> {
-                saveJobs(context, org.json.JSONArray())
+                ArchDroidScheduler.cancelAllJobs(context)
                 200 to JSONObject().put("status", "ok").put("cleared", true).toString()
+            }
+
+            "run", "trigger" -> {
+                val jobId = mergedParams["job_id"]?.toIntOrNull() ?: mergedParams["id"]?.toIntOrNull()
+                val script = mergedParams["script"] ?: ""
+                if (script.isNotEmpty()) {
+                    thread(isDaemon = true) {
+                        ArchDroidScheduler.executeJobWithWakeLock(context, script, jobId ?: -1)
+                    }
+                    200 to JSONObject().put("status", "ok").put("message", "Triggered job execution").toString()
+                } else {
+                    400 to jsonError("Missing script to run")
+                }
             }
 
             else -> {
