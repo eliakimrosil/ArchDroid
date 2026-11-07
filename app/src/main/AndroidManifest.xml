@@ -31,7 +31,7 @@
 
         <activity
             android:name=".MainActivity"
-            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode|density"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
             android:exported="true"
             android:launchMode="singleTask"
             android:resizeableActivity="true"

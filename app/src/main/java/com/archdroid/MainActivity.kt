@@ -127,7 +127,7 @@ class MainActivity : ComponentActivity() {
     private var bootstrapState by mutableStateOf(
         BootstrapProgress("Initializing", "Checking Arch Linux runtime...", 0f)
     )
-    private var isReady by mutableStateOf(false)
+    private var isReady by mutableStateOf(TerminalSessionHolder.sessions.isNotEmpty())
     private var errorMessage by mutableStateOf<String?>(null)
 
     private val sessions get() = TerminalSessionHolder.sessions
@@ -719,6 +719,14 @@ class MainActivity : ComponentActivity() {
 
         startForegroundServiceSafe()
         ArchDroidApiServer.start(this)
+
+        if (TerminalSessionHolder.sessions.isNotEmpty()) {
+            isReady = true
+            TerminalSessionHolder.sessions.forEach {
+                it.updateTerminalSessionClient(sessionClient)
+            }
+        }
+
         startBootstrap()
 
         setContent {
@@ -798,6 +806,23 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startBootstrap() {
+        if (TerminalSessionHolder.sessions.isNotEmpty()) {
+            isReady = true
+            TerminalSessionHolder.sessions.forEach {
+                it.updateTerminalSessionClient(sessionClient)
+            }
+            TerminalSessionHolder.activeSession?.let {
+                terminalViewRef?.attachSession(it)
+            }
+            checkBatteryOptimization()
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    BootstrapManager.writeCustomScripts(BootstrapManager.getRootfsDir(this@MainActivity))
+                } catch (_: Throwable) {}
+            }
+            return
+        }
+
         lifecycleScope.launch {
             try {
                 BootstrapManager.writeCustomScripts(BootstrapManager.getRootfsDir(this@MainActivity))
