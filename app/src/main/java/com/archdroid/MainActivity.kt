@@ -3582,7 +3582,7 @@ class MainActivity : ComponentActivity() {
                             Icon(
                                 imageVector = Icons.Default.Bolt,
                                 contentDescription = null,
-                                tint = Color(0xFF58A6FF),
+                                tint = currentTheme.tabActiveColor,
                                 modifier = Modifier.size(22.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -3628,12 +3628,12 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier
                                         .size(8.dp)
                                         .clip(CircleShape)
-                                        .background(Color(0xFF7EE787))
+                                        .background(currentTheme.tabActiveColor)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "${automationsList.count { it.persisted }} Active Jobs",
-                                    color = Color(0xFF7EE787),
+                                    color = currentTheme.tabActiveColor,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 11.sp
                                 )
@@ -3654,8 +3654,8 @@ class MainActivity : ComponentActivity() {
                                 },
                                 modifier = Modifier.height(24.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF58A6FF)),
-                                border = BorderStroke(0.8.dp, Color(0xFF58A6FF).copy(alpha = 0.4f))
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = currentTheme.tabActiveColor),
+                                border = BorderStroke(0.8.dp, currentTheme.tabActiveColor.copy(alpha = 0.4f))
                             ) {
                                 Text("Sync All", fontSize = 10.sp)
                             }
@@ -3711,7 +3711,7 @@ class MainActivity : ComponentActivity() {
                 .background(currentTheme.bgColor)
                 .border(
                     width = 1.dp,
-                    color = if (isRunning) Color(0xFF58A6FF) else Color(0xFF30363D),
+                    color = if (isRunning) currentTheme.tabActiveColor else currentTheme.fgColor.copy(alpha = 0.15f),
                     shape = RoundedCornerShape(8.dp)
                 )
                 .padding(horizontal = if (isWide) 14.dp else 10.dp, vertical = if (isWide) 10.dp else 8.dp)
@@ -3730,12 +3730,12 @@ class MainActivity : ComponentActivity() {
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(Color(0xFF1F6FEB).copy(alpha = 0.25f))
+                                .background(currentTheme.tabActiveColor.copy(alpha = 0.20f))
                                 .padding(horizontal = 5.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = "#${item.id}",
-                                color = Color(0xFF58A6FF),
+                                color = currentTheme.tabActiveColor,
                                 fontSize = if (isWide) 11.sp else 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace
@@ -3774,14 +3774,14 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(
-                                    if (item.persisted) Color(0xFF238636).copy(alpha = 0.2f)
-                                    else Color(0xFF8B949E).copy(alpha = 0.2f)
+                                    if (item.persisted) currentTheme.tabActiveColor.copy(alpha = 0.20f)
+                                    else currentTheme.fgColor.copy(alpha = 0.10f)
                                 )
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = if (item.persisted) "SCHEDULED" else "INACTIVE",
-                                color = if (item.persisted) Color(0xFF7EE787) else Color(0xFF8B949E),
+                                color = if (item.persisted) currentTheme.tabActiveColor else currentTheme.fgColor.copy(alpha = 0.5f),
                                 fontSize = if (isWide) 10.sp else 9.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -3808,7 +3808,7 @@ class MainActivity : ComponentActivity() {
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "⏱ Last: ${item.lastRun}",
-                            color = Color(0xFF58A6FF),
+                            color = currentTheme.tabActiveColor,
                             fontSize = if (isWide) 10.5.sp else 9.5.sp,
                             fontFamily = FontFamily.Monospace,
                             maxLines = 1,
@@ -3825,7 +3825,7 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.height(if (isWide) 28.dp else 26.dp),
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = currentTheme.fgColor),
-                            border = BorderStroke(0.8.dp, Color(0xFF30363D))
+                            border = BorderStroke(0.8.dp, currentTheme.fgColor.copy(alpha = 0.2f))
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Description,
@@ -3853,7 +3853,7 @@ class MainActivity : ComponentActivity() {
                             enabled = !isRunning,
                             modifier = Modifier.height(if (isWide) 28.dp else 26.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636))
+                            colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabActiveColor)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
@@ -3923,7 +3923,7 @@ class MainActivity : ComponentActivity() {
                             Icon(
                                 imageVector = Icons.Default.Description,
                                 contentDescription = null,
-                                tint = Color(0xFF58A6FF),
+                                tint = currentTheme.tabActiveColor,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -3997,8 +3997,8 @@ class MainActivity : ComponentActivity() {
                                     currentLogContent = ArchDroidAutomationManager.readRecentLogs(this@MainActivity, it, selectedLogScript)
                                 }
                             },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF58A6FF)),
-                            border = BorderStroke(0.8.dp, Color(0xFF58A6FF).copy(alpha = 0.4f))
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = currentTheme.tabActiveColor),
+                            border = BorderStroke(0.8.dp, currentTheme.tabActiveColor.copy(alpha = 0.4f))
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
@@ -4015,7 +4015,7 @@ class MainActivity : ComponentActivity() {
                                 cm.setPrimaryClip(ClipData.newPlainText("Job Logs", currentLogContent))
                                 Toast.makeText(this@MainActivity, "Logs copied to clipboard", Toast.LENGTH_SHORT).show()
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1F6FEB))
+                            colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabActiveColor)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ContentCopy,
