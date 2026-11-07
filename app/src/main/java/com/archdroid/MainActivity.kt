@@ -33,8 +33,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.ui.window.Dialog
@@ -61,6 +62,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -87,7 +89,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
@@ -1018,88 +1023,455 @@ class MainActivity : ComponentActivity() {
         errorMessage: String?,
         onRetry: () -> Unit
     ) {
-        Column(
+        val configuration = LocalConfiguration.current
+        val isWide = configuration.screenWidthDp >= 600
+
+        // Continuous pulse animation for logo and glowing badge
+        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+        val pulseAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 0.90f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1400, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "pulseAlpha"
+        )
+        val pulseScale by infiniteTransition.animateFloat(
+            initialValue = 0.95f,
+            targetValue = 1.05f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1400, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "pulseScale"
+        )
+        val cursorAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.15f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(500, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "cursorAlpha"
+        )
+
+        // Smooth progress animation
+        val animatedProgress by animateFloatAsState(
+            targetValue = state.progress.coerceIn(0f, 1f),
+            animationSpec = tween(350, easing = LinearOutSlowInEasing),
+            label = "bootstrapProgress"
+        )
+
+        // Rotating Tips carousel
+        val tips = remember {
+            listOf(
+                "ArchDroid runs pure standalone Linux with direct Android native API bridge.",
+                "Automations survive reboots and execute headless in the background via JobScheduler.",
+                "Press Ctrl+Alt+T or use the top bar to open multiple concurrent terminal sessions.",
+                "Use archdroid-notification and archdroid-job-scheduler in your bash scripts.",
+                "Antigravity CLI (agy) is bundled and directly accessible in your terminal.",
+                "Full glibc & pacman environment: install standard Linux packages seamlessly."
+            )
+        }
+        var tipIndex by remember { mutableStateOf(0) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(6000L)
+                tipIndex = (tipIndex + 1) % tips.size
+            }
+        }
+
+        // 4 pipeline stages
+        val stages = remember {
+            listOf("Prepare", "Rootfs", "AI Tools", "Ready")
+        }
+        val currentStageIndex = when {
+            state.progress >= 0.98f -> 3
+            state.progress >= 0.58f -> 2
+            state.progress >= 0.12f -> 1
+            else -> 0
+        }
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(28.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+                .background(currentTheme.bgColor)
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "ArchDroid",
-                color = Color(0xFFE6EDF3),
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "Mobile Linux Shell & Automation Platform",
-                color = Color(0xFF8B949E),
-                fontSize = 13.sp,
-                fontFamily = FontFamily.Monospace
-            )
-            Spacer(modifier = Modifier.height(28.dp))
-
-            if (errorMessage != null) {
-                Text(
-                    text = "Setup Error:\n$errorMessage",
-                    color = Color(0xFFFF7B72),
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
+            Card(
+                modifier = Modifier
+                    .widthIn(min = 360.dp, max = 560.dp)
+                    .fillMaxWidth(if (isWide) 0.55f else 1f)
+                    .shadow(16.dp, RoundedCornerShape(20.dp)),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                border = BorderStroke(1.dp, Color(0xFF30363D))
+            ) {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF161B22), RoundedCornerShape(8.dp))
-                        .padding(12.dp)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = onRetry) {
-                    Text("Retry Setup")
-                }
-            } else {
-                LinearProgressIndicator(
-                    progress = { state.progress.coerceIn(0f, 1f) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    color = Color(0xFF58A6FF),
-                    trackColor = Color(0xFF21262D)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = state.step,
-                    color = Color(0xFFE6EDF3),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Monospace
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = state.detail,
-                    color = Color(0xFF8B949E),
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontFamily = FontFamily.Monospace
-                )
-
-                Spacer(modifier = Modifier.height(26.dp))
-                OutlinedButton(
-                    onClick = {
-                        try {
-                            restorePickerLauncher.launch(arrayOf("*/*"))
-                        } catch (_: Throwable) {}
-                    },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF58A6FF))
+                        .padding(horizontal = 24.dp, vertical = 28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.SettingsBackupRestore,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                    // Glowing Arch Linux Logo Badge
+                    Box(
+                        modifier = Modifier
+                            .size(76.dp)
+                            .shadow(12.dp, CircleShape)
+                            .background(Color(0xFF0D1117), CircleShape)
+                            .border(
+                                BorderStroke(
+                                    2.dp,
+                                    currentTheme.tabActiveColor.copy(alpha = pulseAlpha)
+                                ),
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                            contentDescription = "ArchDroid Logo",
+                            modifier = Modifier
+                                .size(60.dp)
+                                .scale(pulseScale)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "ArchDroid",
+                        color = Color(0xFFE6EDF3),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Import Backup Snapshot Instead", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Mobile Linux Shell & Automation Platform",
+                        color = Color(0xFF8B949E),
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    if (errorMessage != null) {
+                        // Error Card State
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF261315)),
+                            border = BorderStroke(1.dp, Color(0xFFF85149).copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = Color(0xFFF85149),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Setup Encountered an Error",
+                                        color = Color(0xFFF85149),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = errorMessage,
+                                    color = Color(0xFFFF7B72),
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    maxLines = 6,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF0D1117), RoundedCornerShape(6.dp))
+                                        .padding(8.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    cm.setPrimaryClip(ClipData.newPlainText("ArchDroid Error Log", errorMessage))
+                                    Toast.makeText(this@MainActivity, "Error copied to clipboard", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF8B949E)),
+                                border = BorderStroke(1.dp, Color(0xFF30363D)),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Copy Error", fontSize = 12.sp)
+                            }
+
+                            Button(
+                                onClick = onRetry,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabActiveColor),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Retry Setup", fontSize = 12.sp, color = Color.White)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                try {
+                                    restorePickerLauncher.launch(arrayOf("*/*"))
+                                } catch (_: Throwable) {}
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = currentTheme.tabActiveColor),
+                            border = BorderStroke(1.dp, currentTheme.tabActiveColor.copy(alpha = 0.45f)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SettingsBackupRestore,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Import Backup Snapshot Instead",
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    } else {
+                        // 4-Stage Pipeline Breadcrumb Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            stages.forEachIndexed { idx, stageTitle ->
+                                val isDone = idx < currentStageIndex
+                                val isActive = idx == currentStageIndex
+                                val pillBg = when {
+                                    isDone -> currentTheme.tabActiveColor.copy(alpha = 0.2f)
+                                    isActive -> currentTheme.tabActiveColor
+                                    else -> Color(0xFF21262D)
+                                }
+                                val pillTextColor = when {
+                                    isActive -> Color.White
+                                    isDone -> currentTheme.tabActiveColor
+                                    else -> Color(0xFF6E7681)
+                                }
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .background(pillBg, RoundedCornerShape(12.dp))
+                                        .border(
+                                            BorderStroke(
+                                                1.dp,
+                                                if (isActive || isDone) currentTheme.tabActiveColor.copy(alpha = 0.5f) else Color.Transparent
+                                            ),
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    if (isDone) {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = currentTheme.tabActiveColor,
+                                            modifier = Modifier.size(11.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                    } else if (isActive) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .background(Color.White, CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                    }
+                                    Text(
+                                        text = stageTitle,
+                                        color = pillTextColor,
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+
+                                if (idx < stages.lastIndex) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(2.dp)
+                                            .padding(horizontal = 4.dp)
+                                            .background(
+                                                if (idx < currentStageIndex) currentTheme.tabActiveColor else Color(0xFF30363D)
+                                            )
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Step and Percentage Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = state.step,
+                                color = Color(0xFFE6EDF3),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "${(animatedProgress * 100).roundToInt()}%",
+                                color = currentTheme.tabActiveColor,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Smooth Linear Progress Indicator
+                        LinearProgressIndicator(
+                            progress = { animatedProgress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = currentTheme.tabActiveColor,
+                            trackColor = Color(0xFF21262D)
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Terminal Log / Activity Box with Blinking Cursor
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF0D1117), RoundedCornerShape(8.dp))
+                                .border(BorderStroke(1.dp, Color(0xFF30363D)), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 9.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "arch-init: ",
+                                    color = currentTheme.tabActiveColor,
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = state.detail.ifEmpty { "processing..." },
+                                    color = Color(0xFFC9D1D9),
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    text = "▌",
+                                    color = currentTheme.cursorColor.copy(alpha = cursorAlpha),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        // Pro-Tip Box
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF1F242C).copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                                .border(BorderStroke(1.dp, Color(0xFF30363D).copy(alpha = 0.5f)), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.Top) {
+                                Text(
+                                    text = "💡 ",
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    text = tips[tipIndex],
+                                    color = Color(0xFF8B949E),
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    lineHeight = 15.sp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Snapshot Restore Button
+                        OutlinedButton(
+                            onClick = {
+                                try {
+                                    restorePickerLauncher.launch(arrayOf("*/*"))
+                                } catch (_: Throwable) {}
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = currentTheme.tabActiveColor),
+                            border = BorderStroke(1.dp, currentTheme.tabActiveColor.copy(alpha = 0.45f)),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SettingsBackupRestore,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Import Backup Snapshot Instead",
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
                 }
             }
         }
