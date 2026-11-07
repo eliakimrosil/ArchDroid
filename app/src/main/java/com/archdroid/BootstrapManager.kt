@@ -105,6 +105,18 @@ object BootstrapManager {
         shmDir.mkdirs()
         createSysdataFiles(sysdataDir)
 
+        val loader32Dst = File(context.filesDir, "proot-loader32")
+        if (!loader32Dst.exists()) {
+            try {
+                context.assets.open("proot-loader32").use { input ->
+                    FileOutputStream(loader32Dst).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                loader32Dst.setExecutable(true, false)
+            } catch (_: Throwable) {}
+        }
+
         if (isBootstrapped(context)) {
             updateScriptsIfBootstrapped(context, rootfsDir)
             onProgress(BootstrapProgress("Ready", "Arch Linux ARM runtime verified", 1.0f))

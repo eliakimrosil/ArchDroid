@@ -16,7 +16,9 @@ object ProotSessionManager {
         val nativeLibDir = context.applicationInfo.nativeLibraryDir
         val prootBin = File(nativeLibDir, "libproot.so").absolutePath
         val prootLoader = File(nativeLibDir, "libproot-loader.so").absolutePath
-        val prootLoader32 = File(nativeLibDir, "libproot-loader32.so").absolutePath
+        val prootLoader32 = File(nativeLibDir, "libproot-loader32.so").let {
+            if (it.exists()) it.absolutePath else File(context.filesDir, "proot-loader32").absolutePath
+        }
 
         val rootfsDir = BootstrapManager.getRootfsDir(context)
         val sysdataDir = BootstrapManager.getSysdataDir(context)
@@ -152,7 +154,9 @@ object ProotSessionManager {
         val nativeLibDir = context.applicationInfo.nativeLibraryDir
         val prootBin = File(nativeLibDir, "libproot.so").absolutePath
         val prootLoader = File(nativeLibDir, "libproot-loader.so").absolutePath
-        val prootLoader32 = File(nativeLibDir, "libproot-loader32.so").absolutePath
+        val prootLoader32 = File(nativeLibDir, "libproot-loader32.so").let {
+            if (it.exists()) it.absolutePath else File(context.filesDir, "proot-loader32").absolutePath
+        }
 
         val shellInside = when {
             File(rootfsDir, "usr/bin/bash").exists() -> "/usr/bin/bash"
