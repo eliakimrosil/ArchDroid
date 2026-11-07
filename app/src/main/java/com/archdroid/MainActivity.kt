@@ -1807,7 +1807,13 @@ class MainActivity : ComponentActivity() {
 
         // Unified Settings Hub (Option A)
         if (showSettingsDialog) {
-            val settingsTabs = listOf("Appearance", "System", "Backup", "Storage", "About")
+            val settingsTabs = listOf(
+                Pair("Appearance", Icons.Default.Palette),
+                Pair("System", Icons.Default.Settings),
+                Pair("Backup", Icons.Default.Backup),
+                Pair("Storage", Icons.Default.Storage),
+                Pair("About", Icons.Default.Info)
+            )
             val screenWidth = LocalConfiguration.current.screenWidthDp
             val isWide = screenWidth >= 600
             val focusRequester = remember { FocusRequester() }
@@ -1836,10 +1842,10 @@ class MainActivity : ComponentActivity() {
                                 true
                             } else false
                         }
-                        .widthIn(min = if (isWide) 700.dp else 300.dp, max = if (isWide) 1400.dp else 440.dp)
-                        .fillMaxWidth(if (isWide) 0.80f else 0.96f)
-                        .heightIn(min = if (isWide) 560.dp else 400.dp, max = if (isWide) 880.dp else 750.dp)
-                        .fillMaxHeight(if (isWide) 0.80f else 0.88f),
+                        .widthIn(min = if (isWide) 820.dp else 300.dp, max = if (isWide) 1150.dp else 440.dp)
+                        .fillMaxWidth(if (isWide) 0.82f else 0.96f)
+                        .heightIn(min = if (isWide) 560.dp else 400.dp, max = if (isWide) 760.dp else 750.dp)
+                        .fillMaxHeight(if (isWide) 0.82f else 0.88f),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = currentTheme.topBarColor),
                     border = BorderStroke(1.dp, Color(0xFF30363D))
@@ -1885,706 +1891,1506 @@ class MainActivity : ComponentActivity() {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Category Tabs (Horizontal Chips)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            settingsTabs.forEachIndexed { index, tabName ->
-                                val active = selectedSettingsTab == index
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (active) currentTheme.tabActiveColor else currentTheme.tabInactiveColor)
-                                        .clickable { selectedSettingsTab = index }
-                                        .padding(horizontal = 11.dp, vertical = 6.dp)
-                                ) {
-                                    Text(
-                                        text = tabName,
-                                        color = if (active) Color.White else currentTheme.fgColor.copy(alpha = 0.8f),
-                                        fontSize = 12.sp,
-                                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
-                                    )
+                        if (!isWide) {
+                            // Mobile: Top Horizontal Tabs
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                settingsTabs.forEachIndexed { index, (tabName, tabIcon) ->
+                                    val active = selectedSettingsTab == index
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (active) currentTheme.tabActiveColor else currentTheme.tabInactiveColor)
+                                            .clickable { selectedSettingsTab = index }
+                                            .padding(horizontal = 11.dp, vertical = 6.dp)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = tabIcon,
+                                                contentDescription = null,
+                                                tint = if (active) Color.White else currentTheme.fgColor.copy(alpha = 0.8f),
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(5.dp))
+                                            Text(
+                                                text = tabName,
+                                                color = if (active) Color.White else currentTheme.fgColor.copy(alpha = 0.8f),
+                                                fontSize = 12.sp,
+                                                fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
+                                            )
+                                        }
+                                    }
                                 }
                             }
+                            Spacer(modifier = Modifier.height(14.dp))
+                            HorizontalDivider(color = currentTheme.fgColor.copy(alpha = 0.15f))
+                            Spacer(modifier = Modifier.height(12.dp))
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
-                        HorizontalDivider(color = currentTheme.fgColor.copy(alpha = 0.15f))
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Tab Content
-                        Column(
+                        // Main Content Area: Sidebar (Desktop) + Tab Content
+                        Row(
                             modifier = Modifier
-                                .fillMaxWidth()
                                 .weight(1f)
-                                .verticalScroll(rememberScrollState())
+                                .fillMaxWidth()
                         ) {
-                            when (selectedSettingsTab) {
-                                0 -> {
-                                    // === Tab 0: Appearance ===
-                                    Text(
-                                        text = "Color Scheme & Theme",
-                                        color = Color(0xFF1793D1),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        TerminalThemeManager.PRESETS.forEach { theme ->
-                                            val isSelected = currentTheme.name == theme.name
-                                            Row(
+                            if (isWide) {
+                                // Desktop Left Navigation Sidebar
+                                Column(
+                                    modifier = Modifier
+                                        .width(200.dp)
+                                        .fillMaxHeight()
+                                        .padding(end = 12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    settingsTabs.forEachIndexed { index, (tabName, tabIcon) ->
+                                        val active = selectedSettingsTab == index
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(
+                                                    if (active) currentTheme.tabActiveColor.copy(alpha = 0.25f)
+                                                    else Color.Transparent
+                                                )
+                                                .border(
+                                                    width = if (active) 1.dp else 0.dp,
+                                                    color = if (active) currentTheme.tabActiveColor else Color.Transparent,
+                                                    shape = RoundedCornerShape(8.dp)
+                                                )
+                                                .clickable { selectedSettingsTab = index }
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = tabIcon,
+                                                contentDescription = null,
+                                                tint = if (active) currentTheme.tabActiveColor else currentTheme.fgColor.copy(alpha = 0.65f),
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Text(
+                                                text = tabName,
+                                                color = if (active) currentTheme.fgColor else currentTheme.fgColor.copy(alpha = 0.75f),
+                                                fontSize = 13.sp,
+                                                fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Vertical Divider between sidebar and content
+                                Box(
+                                    modifier = Modifier
+                                        .width(1.dp)
+                                        .fillMaxHeight()
+                                        .background(currentTheme.fgColor.copy(alpha = 0.12f))
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                            }
+
+                            // Right Scrollable Content Pane
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                when (selectedSettingsTab) {
+                                    0 -> {
+                                        // === Tab 0: Appearance ===
+                                        if (isWide) {
+                                            // Desktop Live Terminal Preview Box
+                                            Box(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
                                                     .clip(RoundedCornerShape(8.dp))
-                                                    .background(if (isSelected) currentTheme.tabActiveColor.copy(alpha = 0.25f) else currentTheme.tabInactiveColor)
-                                                    .border(
-                                                        width = if (isSelected) 1.5.dp else 0.5.dp,
-                                                        color = if (isSelected) currentTheme.tabActiveColor else Color.Transparent,
-                                                        shape = RoundedCornerShape(8.dp)
-                                                    )
-                                                    .clickable {
-                                                        currentTheme = theme
-                                                        TerminalThemeManager.applyTheme(
-                                                            this@MainActivity,
-                                                            theme,
-                                                            sessions,
-                                                            terminalViewRef
+                                                    .background(currentTheme.bgColor)
+                                                    .border(1.dp, currentTheme.tabActiveColor.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+                                                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                                            ) {
+                                                Column {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFFF5F56)))
+                                                        Spacer(modifier = Modifier.width(5.dp))
+                                                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFFFBD2E)))
+                                                        Spacer(modifier = Modifier.width(5.dp))
+                                                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF27C93F)))
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(
+                                                            text = "Live Terminal Preview • ${currentTheme.name}",
+                                                            color = currentTheme.fgColor.copy(alpha = 0.7f),
+                                                            fontSize = 11.sp,
+                                                            fontFamily = FontFamily.Monospace
                                                         )
                                                     }
-                                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text(
+                                                            text = "archdroid:~# ",
+                                                            color = currentTheme.tabActiveColor,
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontFamily = FontFamily.Monospace
+                                                        )
+                                                        Text(
+                                                            text = "echo \"Fast standalone Linux & AI on Android\"",
+                                                            color = currentTheme.fgColor,
+                                                            fontSize = 12.sp,
+                                                            fontFamily = FontFamily.Monospace
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(14.dp))
+                                        }
+
+                                        Text(
+                                            text = "Color Scheme & Theme",
+                                            color = Color(0xFF1793D1),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        if (isWide) {
+                                            // 2-Column Grid on Desktop
+                                            val chunkedThemes = TerminalThemeManager.PRESETS.chunked(2)
+                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                chunkedThemes.forEach { rowThemes ->
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        rowThemes.forEach { theme ->
+                                                            val isSelected = currentTheme.name == theme.name
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .weight(1f)
+                                                                    .clip(RoundedCornerShape(8.dp))
+                                                                    .background(if (isSelected) currentTheme.tabActiveColor.copy(alpha = 0.25f) else currentTheme.tabInactiveColor)
+                                                                    .border(
+                                                                        width = if (isSelected) 1.5.dp else 0.5.dp,
+                                                                        color = if (isSelected) currentTheme.tabActiveColor else Color.Transparent,
+                                                                        shape = RoundedCornerShape(8.dp)
+                                                                    )
+                                                                    .clickable {
+                                                                        currentTheme = theme
+                                                                        TerminalThemeManager.applyTheme(
+                                                                            this@MainActivity,
+                                                                            theme,
+                                                                            sessions,
+                                                                            terminalViewRef
+                                                                        )
+                                                                    }
+                                                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.SpaceBetween
+                                                            ) {
+                                                                Text(
+                                                                    text = theme.name,
+                                                                    color = currentTheme.fgColor,
+                                                                    fontSize = 12.sp,
+                                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                                    maxLines = 1,
+                                                                    overflow = TextOverflow.Ellipsis
+                                                                )
+                                                                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                                    listOf(theme.bgColor, theme.fgColor, theme.tabActiveColor, theme.cursorColor).forEach { col ->
+                                                                        Box(
+                                                                            modifier = Modifier
+                                                                                .size(10.dp)
+                                                                                .clip(CircleShape)
+                                                                                .background(col)
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        if (rowThemes.size == 1) {
+                                                            Spacer(modifier = Modifier.weight(1f))
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            // 1-Column on Mobile
+                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                TerminalThemeManager.PRESETS.forEach { theme ->
+                                                    val isSelected = currentTheme.name == theme.name
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .clip(RoundedCornerShape(8.dp))
+                                                            .background(if (isSelected) currentTheme.tabActiveColor.copy(alpha = 0.25f) else currentTheme.tabInactiveColor)
+                                                            .border(
+                                                                width = if (isSelected) 1.5.dp else 0.5.dp,
+                                                                color = if (isSelected) currentTheme.tabActiveColor else Color.Transparent,
+                                                                shape = RoundedCornerShape(8.dp)
+                                                            )
+                                                            .clickable {
+                                                                currentTheme = theme
+                                                                TerminalThemeManager.applyTheme(
+                                                                    this@MainActivity,
+                                                                    theme,
+                                                                    sessions,
+                                                                    terminalViewRef
+                                                                )
+                                                            }
+                                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Text(
+                                                            text = theme.name,
+                                                            color = currentTheme.fgColor,
+                                                            fontSize = 13.sp,
+                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                        )
+                                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                            listOf(theme.bgColor, theme.fgColor, theme.tabActiveColor, theme.cursorColor).forEach { col ->
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .size(12.dp)
+                                                                        .clip(CircleShape)
+                                                                        .background(col)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(16.dp))
+
+                                        if (isWide) {
+                                            // Desktop: Side-by-side Cursor Style & Font Size
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                            ) {
+                                                // Left: Cursor Style
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = "Cursor Style",
+                                                        color = Color(0xFF1793D1),
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        listOf(
+                                                            "Block" to TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK,
+                                                            "Underline" to TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE,
+                                                            "Bar" to TerminalEmulator.TERMINAL_CURSOR_STYLE_BAR
+                                                        ).forEach { (label, style) ->
+                                                            val isSelected = cursorStyle == style
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .clip(RoundedCornerShape(8.dp))
+                                                                    .background(if (isSelected) currentTheme.tabActiveColor else currentTheme.tabInactiveColor)
+                                                                    .clickable {
+                                                                        cursorStyle = style
+                                                                        applyCursorStyle(style)
+                                                                        TerminalThemeManager.saveCursorStyle(this@MainActivity, style)
+                                                                    }
+                                                                    .padding(horizontal = 14.dp, vertical = 7.dp)
+                                                            ) {
+                                                                Text(
+                                                                    text = label,
+                                                                    color = if (isSelected) Color.White else currentTheme.fgColor,
+                                                                    fontSize = 12.sp,
+                                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // Right: Font Size
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = "Font Size: ${fontSizePx}px",
+                                                        color = Color(0xFF1793D1),
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Row(
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Button(
+                                                            onClick = { zoomOut() },
+                                                            colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor)
+                                                        ) {
+                                                            Text("- A", color = currentTheme.fgColor, fontWeight = FontWeight.Bold)
+                                                        }
+                                                        Button(
+                                                            onClick = { zoomIn() },
+                                                            colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor)
+                                                        ) {
+                                                            Text("+ A", color = currentTheme.fgColor, fontWeight = FontWeight.Bold)
+                                                        }
+                                                        TextButton(onClick = { zoomReset() }) {
+                                                            Text("Reset", color = currentTheme.tabActiveColor)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            // Mobile: Stacked
+                                            Text(
+                                                text = "Cursor Style",
+                                                color = Color(0xFF1793D1),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                listOf(
+                                                    "Block" to TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK,
+                                                    "Underline" to TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE,
+                                                    "Bar" to TerminalEmulator.TERMINAL_CURSOR_STYLE_BAR
+                                                ).forEach { (label, style) ->
+                                                    val isSelected = cursorStyle == style
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(8.dp))
+                                                            .background(if (isSelected) currentTheme.tabActiveColor else currentTheme.tabInactiveColor)
+                                                            .clickable {
+                                                                cursorStyle = style
+                                                                applyCursorStyle(style)
+                                                                TerminalThemeManager.saveCursorStyle(this@MainActivity, style)
+                                                            }
+                                                            .padding(horizontal = 14.dp, vertical = 7.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = label,
+                                                            color = if (isSelected) Color.White else currentTheme.fgColor,
+                                                            fontSize = 12.sp,
+                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(16.dp))
+                                            Text(
+                                                text = "Font Size: ${fontSizePx}px",
+                                                color = Color(0xFF1793D1),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Button(
+                                                    onClick = { zoomOut() },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor)
+                                                ) {
+                                                    Text("- A", color = currentTheme.fgColor, fontWeight = FontWeight.Bold)
+                                                }
+                                                Button(
+                                                    onClick = { zoomIn() },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor)
+                                                ) {
+                                                    Text("+ A", color = currentTheme.fgColor, fontWeight = FontWeight.Bold)
+                                                }
+                                                TextButton(onClick = { zoomReset() }) {
+                                                    Text("Reset", color = currentTheme.tabActiveColor)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    1 -> {
+                                        // === Tab 1: System & Background ===
+                                        Text(
+                                            text = "Background Execution & Keep-Alive",
+                                            color = Color(0xFF1793D1),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                                        val isIgnoringBattery = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && pm != null) {
+                                            pm.isIgnoringBatteryOptimizations(packageName)
+                                        } else true
+
+                                        if (isWide) {
+                                            // Desktop: Side-by-side Battery & Device Controls
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                            ) {
+                                                // Left: Battery Optimization Card
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                                        .padding(14.dp)
+                                                ) {
+                                                    Column {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Info,
+                                                                contentDescription = null,
+                                                                tint = if (isIgnoringBattery) Color(0xFF7EE787) else Color(0xFFFF7B72),
+                                                                modifier = Modifier.size(16.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Text(
+                                                                text = if (isIgnoringBattery) "Battery Optimization: Exempted" else "Battery Optimization: Restricted",
+                                                                color = if (isIgnoringBattery) Color(0xFF7EE787) else Color(0xFFFF7B72),
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontSize = 12.sp
+                                                            )
+                                                        }
+                                                        Spacer(modifier = Modifier.height(6.dp))
+                                                        Text(
+                                                            text = if (isIgnoringBattery)
+                                                                "ArchDroid runs in background without Android Doze killing long-running PRoot processes or AI agents."
+                                                            else
+                                                                "Android may terminate background terminal jobs and LLM agents when the screen is off or app is minimized.",
+                                                            color = currentTheme.fgColor.copy(alpha = 0.8f),
+                                                            fontSize = 11.sp,
+                                                            lineHeight = 15.sp
+                                                        )
+                                                        if (!isIgnoringBattery) {
+                                                            Spacer(modifier = Modifier.height(10.dp))
+                                                            Button(
+                                                                onClick = {
+                                                                    try {
+                                                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                                                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                                                                data = Uri.parse("package:$packageName")
+                                                                            }
+                                                                            startActivity(intent)
+                                                                        }
+                                                                    } catch (_: Throwable) {
+                                                                        try {
+                                                                            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                                                        } catch (_: Throwable) {}
+                                                                    }
+                                                                },
+                                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
+                                                            ) {
+                                                                Text("Disable Restriction", color = Color.White, fontSize = 11.sp)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // Right: Keep Screen On + Terminal Bell Haptics
+                                                Column(
+                                                    modifier = Modifier.weight(1f),
+                                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                                            .padding(12.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.weight(1f),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.WbSunny,
+                                                                contentDescription = null,
+                                                                tint = currentTheme.fgColor,
+                                                                modifier = Modifier.size(18.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.width(10.dp))
+                                                            Column {
+                                                                Text(
+                                                                    text = "Keep Screen On",
+                                                                    color = currentTheme.fgColor,
+                                                                    fontWeight = FontWeight.SemiBold,
+                                                                    fontSize = 13.sp
+                                                                )
+                                                                Text(
+                                                                    text = "Prevents device sleep while terminal active",
+                                                                    color = currentTheme.fgColor.copy(alpha = 0.65f),
+                                                                    fontSize = 11.sp
+                                                                )
+                                                            }
+                                                        }
+                                                        Switch(
+                                                            checked = keepScreenOn,
+                                                            onCheckedChange = { toggleKeepScreenOn(it) }
+                                                        )
+                                                    }
+
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                                            .padding(12.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.weight(1f),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Vibration,
+                                                                contentDescription = null,
+                                                                tint = currentTheme.fgColor,
+                                                                modifier = Modifier.size(18.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.width(10.dp))
+                                                            Column {
+                                                                Text(
+                                                                    text = "Terminal Bell Haptics",
+                                                                    color = currentTheme.fgColor,
+                                                                    fontWeight = FontWeight.SemiBold,
+                                                                    fontSize = 13.sp
+                                                                )
+                                                                Text(
+                                                                    text = "Vibrate on terminal ASCII bell (\\a)",
+                                                                    color = currentTheme.fgColor.copy(alpha = 0.65f),
+                                                                    fontSize = 11.sp
+                                                                )
+                                                            }
+                                                        }
+                                                        Switch(
+                                                            checked = bellHapticEnabled,
+                                                            onCheckedChange = { toggleBellHaptic(it) }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            // Mobile: Stacked
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                                    .padding(12.dp)
+                                            ) {
+                                                Column {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Info,
+                                                            contentDescription = null,
+                                                            tint = if (isIgnoringBattery) Color(0xFF7EE787) else Color(0xFFFF7B72),
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text(
+                                                            text = if (isIgnoringBattery) "Battery Optimization: Exempted" else "Battery Optimization: Restricted",
+                                                            color = if (isIgnoringBattery) Color(0xFF7EE787) else Color(0xFFFF7B72),
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 12.sp
+                                                        )
+                                                    }
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = if (isIgnoringBattery)
+                                                            "ArchDroid runs in background without Android Doze killing long-running PRoot processes or AI agents."
+                                                        else
+                                                            "Android may terminate background terminal jobs and LLM agents when the screen is off or app is minimized.",
+                                                        color = currentTheme.fgColor.copy(alpha = 0.8f),
+                                                        fontSize = 11.sp,
+                                                        lineHeight = 15.sp
+                                                    )
+                                                    if (!isIgnoringBattery) {
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                        Button(
+                                                            onClick = {
+                                                                try {
+                                                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                                                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                                                            data = Uri.parse("package:$packageName")
+                                                                        }
+                                                                        startActivity(intent)
+                                                                    }
+                                                                } catch (_: Throwable) {
+                                                                    try {
+                                                                        startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                                                    } catch (_: Throwable) {}
+                                                                }
+                                                            },
+                                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
+                                                        ) {
+                                                            Text("Disable Restriction", color = Color.White, fontSize = 11.sp)
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(14.dp))
+
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                                    .padding(12.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.SpaceBetween
                                             ) {
-                                                Text(
-                                                    text = theme.name,
-                                                    color = currentTheme.fgColor,
-                                                    fontSize = 13.sp,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                                )
-                                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                    listOf(theme.bgColor, theme.fgColor, theme.tabActiveColor, theme.cursorColor).forEach { col ->
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .size(12.dp)
-                                                                .clip(CircleShape)
-                                                                .background(col)
+                                                Row(
+                                                    modifier = Modifier.weight(1f),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.WbSunny,
+                                                        contentDescription = null,
+                                                        tint = currentTheme.fgColor,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(10.dp))
+                                                    Column {
+                                                        Text(
+                                                            text = "Keep Screen On",
+                                                            color = currentTheme.fgColor,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            fontSize = 13.sp
+                                                        )
+                                                        Text(
+                                                            text = "Prevents device sleep while terminal active",
+                                                            color = currentTheme.fgColor.copy(alpha = 0.65f),
+                                                            fontSize = 11.sp
                                                         )
                                                     }
                                                 }
+                                                Switch(
+                                                    checked = keepScreenOn,
+                                                    onCheckedChange = { toggleKeepScreenOn(it) }
+                                                )
                                             }
-                                        }
-                                    }
 
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Text(
-                                        text = "Cursor Style",
-                                        color = Color(0xFF1793D1),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        listOf(
-                                            "Block" to TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK,
-                                            "Underline" to TerminalEmulator.TERMINAL_CURSOR_STYLE_UNDERLINE,
-                                            "Bar" to TerminalEmulator.TERMINAL_CURSOR_STYLE_BAR
-                                        ).forEach { (label, style) ->
-                                            val isSelected = cursorStyle == style
-                                            Box(
+                                            Spacer(modifier = Modifier.height(10.dp))
+
+                                            Row(
                                                 modifier = Modifier
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(if (isSelected) currentTheme.tabActiveColor else currentTheme.tabInactiveColor)
-                                                    .clickable {
-                                                        cursorStyle = style
-                                                        applyCursorStyle(style)
-                                                        TerminalThemeManager.saveCursorStyle(this@MainActivity, style)
-                                                    }
-                                                    .padding(horizontal = 14.dp, vertical = 7.dp)
+                                                    .fillMaxWidth()
+                                                    .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                                    .padding(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
                                             ) {
-                                                Text(
-                                                    text = label,
-                                                    color = if (isSelected) Color.White else currentTheme.fgColor,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Text(
-                                        text = "Font Size: ${fontSizePx}px",
-                                        color = Color(0xFF1793D1),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Button(
-                                            onClick = { zoomOut() },
-                                            colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor)
-                                        ) {
-                                            Text("- A", color = currentTheme.fgColor, fontWeight = FontWeight.Bold)
-                                        }
-                                        Button(
-                                            onClick = { zoomIn() },
-                                            colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor)
-                                        ) {
-                                            Text("+ A", color = currentTheme.fgColor, fontWeight = FontWeight.Bold)
-                                        }
-                                        TextButton(onClick = { zoomReset() }) {
-                                            Text("Reset", color = currentTheme.tabActiveColor)
-                                        }
-                                    }
-                                }
-                                1 -> {
-                                    // === Tab 1: System & Background ===
-                                    Text(
-                                        text = "Background Execution & Keep-Alive",
-                                        color = Color(0xFF1793D1),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    // Battery Optimization Card
-                                    val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
-                                    val isIgnoringBattery = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && pm != null) {
-                                        pm.isIgnoringBatteryOptimizations(packageName)
-                                    } else true
-
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
-                                            .padding(12.dp)
-                                    ) {
-                                        Column {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Info,
-                                                    contentDescription = null,
-                                                    tint = if (isIgnoringBattery) Color(0xFF7EE787) else Color(0xFFFF7B72),
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = if (isIgnoringBattery) "Battery Optimization: Exempted" else "Battery Optimization: Restricted",
-                                                    color = if (isIgnoringBattery) Color(0xFF7EE787) else Color(0xFFFF7B72),
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 12.sp
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text(
-                                                text = if (isIgnoringBattery)
-                                                    "ArchDroid runs in background without Android Doze killing long-running PRoot processes or AI agents."
-                                                else
-                                                    "Android may terminate background terminal jobs and LLM agents when the screen is off or app is minimized.",
-                                                color = currentTheme.fgColor.copy(alpha = 0.8f),
-                                                fontSize = 11.sp,
-                                                lineHeight = 15.sp
-                                            )
-                                            if (!isIgnoringBattery) {
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                Button(
-                                                    onClick = {
-                                                        try {
-                                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                                                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                                                                    data = Uri.parse("package:$packageName")
-                                                                }
-                                                                startActivity(intent)
-                                                            }
-                                                        } catch (_: Throwable) {
-                                                            try {
-                                                                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-                                                            } catch (_: Throwable) {}
-                                                        }
-                                                    },
-                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
+                                                Row(
+                                                    modifier = Modifier.weight(1f),
+                                                    verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    Text("Disable Restriction", color = Color.White, fontSize = 11.sp)
+                                                    Icon(
+                                                        imageVector = Icons.Default.Vibration,
+                                                        contentDescription = null,
+                                                        tint = currentTheme.fgColor,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(10.dp))
+                                                    Column {
+                                                        Text(
+                                                            text = "Terminal Bell Haptics",
+                                                            color = currentTheme.fgColor,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            fontSize = 13.sp
+                                                        )
+                                                        Text(
+                                                            text = "Vibrate on terminal ASCII bell (\\a)",
+                                                            color = currentTheme.fgColor.copy(alpha = 0.65f),
+                                                            fontSize = 11.sp
+                                                        )
+                                                    }
+                                                }
+                                                Switch(
+                                                    checked = bellHapticEnabled,
+                                                    onCheckedChange = { toggleBellHaptic(it) }
+                                                )
+                                            }
+                                        }
+                                    }
+                                    2 -> {
+                                        // === Tab 2: Backup & Disaster Recovery ===
+                                        if (isWide) {
+                                            // Desktop: Side-by-side Create & Restore Backup
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                            ) {
+                                                // Left: Create Backup Card
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = "Full Environment Snapshot (Mode B)",
+                                                        color = Color(0xFF1793D1),
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = "Backs up the entire Arch Linux container, installed packages (Python, Node, npm), AI agents (agy, claude, codex, hermes), SSH keys, dotfiles, and app settings into a portable .tar.gz archive.",
+                                                        color = currentTheme.fgColor.copy(alpha = 0.8f),
+                                                        fontSize = 11.sp,
+                                                        lineHeight = 15.sp
+                                                    )
+
+                                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                                    if (backupOpInProgress) {
+                                                        LinearProgressIndicator(
+                                                            progress = { backupOpProgress.coerceIn(0f, 1f) },
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .height(6.dp)
+                                                                .clip(RoundedCornerShape(3.dp)),
+                                                            color = Color(0xFF1793D1)
+                                                        )
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                        Text(
+                                                            text = backupOpStatus ?: "Processing...",
+                                                            color = currentTheme.fgColor,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 12.sp
+                                                        )
+                                                        Text(
+                                                            text = backupOpDetail ?: "",
+                                                            color = currentTheme.fgColor.copy(alpha = 0.7f),
+                                                            fontSize = 11.sp,
+                                                            maxLines = 2,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                        Spacer(modifier = Modifier.height(12.dp))
+                                                    } else if (backupOpStatus != null) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                                                .padding(10.dp)
+                                                        ) {
+                                                            Column {
+                                                                Text(
+                                                                    text = backupOpStatus!!,
+                                                                    color = if (backupOpStatus!!.contains("Success") || backupOpStatus!!.contains("Complete")) Color(0xFF7EE787) else Color(0xFFFF7B72),
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    fontSize = 12.sp
+                                                                )
+                                                                if (backupOpDetail != null) {
+                                                                    Text(
+                                                                        text = backupOpDetail!!,
+                                                                        color = currentTheme.fgColor.copy(alpha = 0.8f),
+                                                                        fontSize = 11.sp
+                                                                    )
+                                                                }
+                                                                if (lastCreatedBackupFile != null && lastCreatedBackupFile!!.exists()) {
+                                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                                    Button(
+                                                                        onClick = {
+                                                                            try {
+                                                                                val shareIntent = BackupManager.createShareIntent(this@MainActivity, lastCreatedBackupFile!!)
+                                                                                startActivity(Intent.createChooser(shareIntent, "Share ArchDroid Snapshot"))
+                                                                            } catch (_: Throwable) {}
+                                                                        },
+                                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
+                                                                    ) {
+                                                                        Icon(
+                                                                            imageVector = Icons.Default.Share,
+                                                                            contentDescription = null,
+                                                                            modifier = Modifier.size(15.dp),
+                                                                            tint = Color.White
+                                                                        )
+                                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                                        Text("Share Snapshot", color = Color.White, fontSize = 12.sp)
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        Spacer(modifier = Modifier.height(12.dp))
+                                                    }
+
+                                                    Button(
+                                                        onClick = { executeCreateBackup() },
+                                                        enabled = !backupOpInProgress,
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Backup,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(16.dp),
+                                                            tint = Color.White
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text("Create Full Backup Now", color = Color.White, fontSize = 13.sp)
+                                                    }
+                                                }
+
+                                                // Right: Restore Backup Card
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = "Restore Snapshot",
+                                                        color = Color(0xFF1793D1),
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                                    val localBackups = remember(showSettingsDialog) { BackupManager.listLocalBackups() }
+                                                    if (localBackups.isNotEmpty()) {
+                                                        Text(
+                                                            text = "Recent in /sdcard/Download:",
+                                                            color = currentTheme.fgColor.copy(alpha = 0.7f),
+                                                            fontSize = 11.sp
+                                                        )
+                                                        Spacer(modifier = Modifier.height(6.dp))
+                                                        localBackups.take(3).forEach { backupFile ->
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .padding(vertical = 3.dp)
+                                                                    .background(currentTheme.tabInactiveColor, RoundedCornerShape(6.dp))
+                                                                    .clickable(enabled = !backupOpInProgress) {
+                                                                        restoreTargetFile = backupFile
+                                                                        restoreTargetUri = null
+                                                                        showRestoreConfirmDialog = true
+                                                                    }
+                                                                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.SpaceBetween
+                                                            ) {
+                                                                Column(modifier = Modifier.weight(1f)) {
+                                                                    Text(
+                                                                        text = backupFile.name,
+                                                                        color = currentTheme.fgColor,
+                                                                        fontSize = 11.sp,
+                                                                        fontWeight = FontWeight.Medium,
+                                                                        maxLines = 1,
+                                                                        overflow = TextOverflow.Ellipsis,
+                                                                        fontFamily = FontFamily.Monospace
+                                                                    )
+                                                                    Text(
+                                                                        text = "${backupFile.length() / (1024 * 1024)} MB • ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date(backupFile.lastModified()))}",
+                                                                        color = currentTheme.fgColor.copy(alpha = 0.6f),
+                                                                        fontSize = 10.sp
+                                                                    )
+                                                                }
+                                                                Text(
+                                                                    text = "Restore",
+                                                                    color = Color(0xFF1793D1),
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    fontSize = 12.sp
+                                                                )
+                                                            }
+                                                        }
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                    }
+
+                                                    OutlinedButton(
+                                                        onClick = {
+                                                            try {
+                                                                restorePickerLauncher.launch(arrayOf("*/*"))
+                                                            } catch (_: Throwable) {}
+                                                        },
+                                                        enabled = !backupOpInProgress,
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.FolderOpen,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text("Browse & Import Snapshot File...", fontSize = 12.sp)
+                                                    }
                                                 }
                                             }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(14.dp))
-
-                                    // Keep Screen On
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
-                                            .padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.weight(1f),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.WbSunny,
-                                                contentDescription = null,
-                                                tint = currentTheme.fgColor,
-                                                modifier = Modifier.size(18.dp)
+                                        } else {
+                                            // Mobile: Stacked
+                                            Text(
+                                                text = "Full Environment Snapshot (Mode B)",
+                                                color = Color(0xFF1793D1),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
                                             )
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Column {
-                                                Text(
-                                                    text = "Keep Screen On",
-                                                    color = currentTheme.fgColor,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    fontSize = 13.sp
-                                                )
-                                                Text(
-                                                    text = "Prevents device sleep while terminal active",
-                                                    color = currentTheme.fgColor.copy(alpha = 0.65f),
-                                                    fontSize = 11.sp
-                                                )
-                                            }
-                                        }
-                                        Switch(
-                                            checked = keepScreenOn,
-                                            onCheckedChange = { toggleKeepScreenOn(it) }
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(10.dp))
-
-                                    // Terminal Bell Vibration
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
-                                            .padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.weight(1f),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Vibration,
-                                                contentDescription = null,
-                                                tint = currentTheme.fgColor,
-                                                modifier = Modifier.size(18.dp)
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = "Backs up the entire Arch Linux container, installed packages (Python, Node, npm), AI agents (agy, claude, codex, hermes), SSH keys, dotfiles, and app settings into a portable .tar.gz archive.",
+                                                color = currentTheme.fgColor.copy(alpha = 0.8f),
+                                                fontSize = 12.sp,
+                                                lineHeight = 16.sp
                                             )
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Column {
+
+                                            Spacer(modifier = Modifier.height(12.dp))
+
+                                            if (backupOpInProgress) {
+                                                LinearProgressIndicator(
+                                                    progress = { backupOpProgress.coerceIn(0f, 1f) },
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(6.dp)
+                                                        .clip(RoundedCornerShape(3.dp)),
+                                                    color = Color(0xFF1793D1)
+                                                )
+                                                Spacer(modifier = Modifier.height(8.dp))
                                                 Text(
-                                                    text = "Terminal Bell Haptics",
+                                                    text = backupOpStatus ?: "Processing...",
                                                     color = currentTheme.fgColor,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    fontSize = 13.sp
-                                                )
-                                                Text(
-                                                    text = "Vibrate on terminal ASCII bell (\\a)",
-                                                    color = currentTheme.fgColor.copy(alpha = 0.65f),
-                                                    fontSize = 11.sp
-                                                )
-                                            }
-                                        }
-                                        Switch(
-                                            checked = bellHapticEnabled,
-                                            onCheckedChange = { toggleBellHaptic(it) }
-                                        )
-                                    }
-                                }
-                                2 -> {
-                                    // === Tab 2: Backup & Disaster Recovery ===
-                                    Text(
-                                        text = "Full Environment Snapshot (Mode B)",
-                                        color = Color(0xFF1793D1),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "Backs up the entire Arch Linux container, installed packages (Python, Node, npm), AI agents (agy, claude, codex, hermes), SSH keys, dotfiles, and app settings into a portable .tar.gz archive.",
-                                        color = currentTheme.fgColor.copy(alpha = 0.8f),
-                                        fontSize = 12.sp,
-                                        lineHeight = 16.sp
-                                    )
-
-                                    Spacer(modifier = Modifier.height(12.dp))
-
-                                    if (backupOpInProgress) {
-                                        LinearProgressIndicator(
-                                            progress = { backupOpProgress.coerceIn(0f, 1f) },
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(6.dp)
-                                                .clip(RoundedCornerShape(3.dp)),
-                                            color = Color(0xFF1793D1)
-                                        )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text(
-                                            text = backupOpStatus ?: "Processing...",
-                                            color = currentTheme.fgColor,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp
-                                        )
-                                        Text(
-                                            text = backupOpDetail ?: "",
-                                            color = currentTheme.fgColor.copy(alpha = 0.7f),
-                                            fontSize = 11.sp,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                    } else if (backupOpStatus != null) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
-                                                .padding(10.dp)
-                                        ) {
-                                            Column {
-                                                Text(
-                                                    text = backupOpStatus!!,
-                                                    color = if (backupOpStatus!!.contains("Success") || backupOpStatus!!.contains("Complete")) Color(0xFF7EE787) else Color(0xFFFF7B72),
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 12.sp
                                                 )
-                                                if (backupOpDetail != null) {
+                                                Text(
+                                                    text = backupOpDetail ?: "",
+                                                    color = currentTheme.fgColor.copy(alpha = 0.7f),
+                                                    fontSize = 11.sp,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                            } else if (backupOpStatus != null) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                                        .padding(10.dp)
+                                                ) {
+                                                    Column {
+                                                        Text(
+                                                            text = backupOpStatus!!,
+                                                            color = if (backupOpStatus!!.contains("Success") || backupOpStatus!!.contains("Complete")) Color(0xFF7EE787) else Color(0xFFFF7B72),
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 12.sp
+                                                        )
+                                                        if (backupOpDetail != null) {
+                                                            Text(
+                                                                text = backupOpDetail!!,
+                                                                color = currentTheme.fgColor.copy(alpha = 0.8f),
+                                                                fontSize = 11.sp
+                                                            )
+                                                        }
+                                                        if (lastCreatedBackupFile != null && lastCreatedBackupFile!!.exists()) {
+                                                            Spacer(modifier = Modifier.height(8.dp))
+                                                            Button(
+                                                                onClick = {
+                                                                    try {
+                                                                        val shareIntent = BackupManager.createShareIntent(this@MainActivity, lastCreatedBackupFile!!)
+                                                                        startActivity(Intent.createChooser(shareIntent, "Share ArchDroid Snapshot"))
+                                                                    } catch (_: Throwable) {}
+                                                                },
+                                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.Share,
+                                                                    contentDescription = null,
+                                                                    modifier = Modifier.size(15.dp),
+                                                                    tint = Color.White
+                                                                )
+                                                                Spacer(modifier = Modifier.width(6.dp))
+                                                                Text("Share Snapshot", color = Color.White, fontSize = 12.sp)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                            }
+
+                                            Button(
+                                                onClick = { executeCreateBackup() },
+                                                enabled = !backupOpInProgress,
+                                                modifier = Modifier.fillMaxWidth(),
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Backup,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp),
+                                                    tint = Color.White
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text("Create Full Backup Now", color = Color.White, fontSize = 13.sp)
+                                            }
+
+                                            Spacer(modifier = Modifier.height(16.dp))
+                                            Text(
+                                                text = "Restore Snapshot",
+                                                color = Color(0xFF1793D1),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+
+                                            val localBackups = remember(showSettingsDialog) { BackupManager.listLocalBackups() }
+                                            if (localBackups.isNotEmpty()) {
+                                                Text(
+                                                    text = "Recent in /sdcard/Download:",
+                                                    color = currentTheme.fgColor.copy(alpha = 0.7f),
+                                                    fontSize = 11.sp
+                                                )
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                localBackups.take(3).forEach { backupFile ->
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(vertical = 3.dp)
+                                                            .background(currentTheme.tabInactiveColor, RoundedCornerShape(6.dp))
+                                                            .clickable(enabled = !backupOpInProgress) {
+                                                                restoreTargetFile = backupFile
+                                                                restoreTargetUri = null
+                                                                showRestoreConfirmDialog = true
+                                                            }
+                                                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(
+                                                                text = backupFile.name,
+                                                                color = currentTheme.fgColor,
+                                                                fontSize = 11.sp,
+                                                                fontWeight = FontWeight.Medium,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                            Text(
+                                                                text = "${backupFile.length() / (1024 * 1024)} MB • ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date(backupFile.lastModified()))}",
+                                                                color = currentTheme.fgColor.copy(alpha = 0.6f),
+                                                                fontSize = 10.sp
+                                                            )
+                                                        }
+                                                        Text(
+                                                            text = "Restore",
+                                                            color = Color(0xFF1793D1),
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 12.sp
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                            }
+
+                                            OutlinedButton(
+                                                onClick = {
+                                                    try {
+                                                        restorePickerLauncher.launch(arrayOf("*/*"))
+                                                    } catch (_: Throwable) {}
+                                                },
+                                                enabled = !backupOpInProgress,
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.FolderOpen,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text("Browse & Import Snapshot File...", fontSize = 12.sp)
+                                            }
+                                        }
+                                    }
+                                    3 -> {
+                                        // === Tab 3: Storage & Maintenance ===
+                                        if (isWide) {
+                                            // Desktop: Side-by-side Storage & Factory Reset
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                            ) {
+                                                // Left: Container Usage & Clean Caches
+                                                Column(modifier = Modifier.weight(1f)) {
                                                     Text(
-                                                        text = backupOpDetail!!,
+                                                        text = "Rootfs Storage Usage",
+                                                        color = Color(0xFF1793D1),
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                                            .padding(14.dp)
+                                                    ) {
+                                                        Column {
+                                                            Row(
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.SpaceBetween
+                                                            ) {
+                                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                    Icon(
+                                                                        imageVector = Icons.Default.Storage,
+                                                                        contentDescription = null,
+                                                                        tint = Color(0xFF1793D1),
+                                                                        modifier = Modifier.size(18.dp)
+                                                                    )
+                                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                                    Text(
+                                                                        text = "Container Size",
+                                                                        color = currentTheme.fgColor,
+                                                                        fontWeight = FontWeight.SemiBold,
+                                                                        fontSize = 13.sp
+                                                                    )
+                                                                }
+                                                                Text(
+                                                                    text = if (rootfsDiskUsageMb > 0) "~${rootfsDiskUsageMb} MB" else "Calculating...",
+                                                                    color = Color(0xFF1793D1),
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    fontSize = 14.sp
+                                                                )
+                                                            }
+                                                            Spacer(modifier = Modifier.height(6.dp))
+                                                            Text(
+                                                                text = "Storage used by Arch Linux rootfs, binaries, python/npm libraries, and user files in /root.",
+                                                                color = currentTheme.fgColor.copy(alpha = 0.7f),
+                                                                fontSize = 11.sp
+                                                            )
+                                                        }
+                                                    }
+
+                                                    Spacer(modifier = Modifier.height(14.dp))
+                                                    Text(
+                                                        text = "Clean Temporary Caches",
+                                                        color = Color(0xFF1793D1),
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Text(
+                                                        text = "Purges temporary PRoot sockets, fifos, /tmp/* files, and pacman download caches without touching installed software or code.",
+                                                        color = currentTheme.fgColor.copy(alpha = 0.75f),
+                                                        fontSize = 11.sp
+                                                    )
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    Button(
+                                                        onClick = { cleanTemporaryCaches() },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor),
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.CleaningServices,
+                                                            contentDescription = null,
+                                                            tint = currentTheme.fgColor,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(
+                                                            text = if (lastCleanedMb >= 0) "Cleaned Caches! (Reclaimed ~${lastCleanedMb} MB)" else "Clean Temporary Caches",
+                                                            color = currentTheme.fgColor,
+                                                            fontSize = 12.sp
+                                                        )
+                                                    }
+                                                }
+
+                                                // Right: Factory Reset (Danger Zone)
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = "Factory Reset / Re-bootstrap",
+                                                        color = Color(0xFFFF7B72),
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .background(Color(0xFFDA3633).copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                                            .border(1.dp, Color(0xFFDA3633).copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                                                            .padding(14.dp)
+                                                    ) {
+                                                        Column {
+                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.Warning,
+                                                                    contentDescription = null,
+                                                                    tint = Color(0xFFFF7B72),
+                                                                    modifier = Modifier.size(18.dp)
+                                                                )
+                                                                Spacer(modifier = Modifier.width(8.dp))
+                                                                Text(
+                                                                    text = "Danger Zone",
+                                                                    color = Color(0xFFFF7B72),
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    fontSize = 13.sp
+                                                                )
+                                                            }
+                                                            Spacer(modifier = Modifier.height(6.dp))
+                                                            Text(
+                                                                text = "Wipes the PRoot Linux container and re-extracts the factory Arch Linux ARM image. Useful if pacman packages or runtime get corrupted. Your backups in /sdcard/Download will NOT be deleted.",
+                                                                color = currentTheme.fgColor.copy(alpha = 0.8f),
+                                                                fontSize = 11.sp,
+                                                                lineHeight = 15.sp
+                                                            )
+                                                            Spacer(modifier = Modifier.height(14.dp))
+                                                            Button(
+                                                                onClick = { showResetConfirmDialog = true },
+                                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)),
+                                                                modifier = Modifier.fillMaxWidth()
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.DeleteSweep,
+                                                                    contentDescription = null,
+                                                                    tint = Color.White,
+                                                                    modifier = Modifier.size(16.dp)
+                                                                )
+                                                                Spacer(modifier = Modifier.width(8.dp))
+                                                                Text("Re-bootstrap Container (Reset)", color = Color.White, fontSize = 12.sp)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            // Mobile: Stacked
+                                            Text(
+                                                text = "Rootfs Storage Usage",
+                                                color = Color(0xFF1793D1),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
+                                                    .padding(14.dp)
+                                            ) {
+                                                Column {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Storage,
+                                                                contentDescription = null,
+                                                                tint = Color(0xFF1793D1),
+                                                                modifier = Modifier.size(18.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.width(8.dp))
+                                                            Text(
+                                                                text = "Container Size",
+                                                                color = currentTheme.fgColor,
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                fontSize = 13.sp
+                                                            )
+                                                        }
+                                                        Text(
+                                                            text = if (rootfsDiskUsageMb > 0) "~${rootfsDiskUsageMb} MB" else "Calculating...",
+                                                            color = Color(0xFF1793D1),
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 14.sp
+                                                        )
+                                                    }
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Text(
+                                                        text = "Storage used by Arch Linux rootfs, binaries, python/npm libraries, and user files in /root.",
+                                                        color = currentTheme.fgColor.copy(alpha = 0.7f),
+                                                        fontSize = 11.sp
+                                                    )
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(16.dp))
+                                            Text(
+                                                text = "Clean Temporary Caches",
+                                                color = Color(0xFF1793D1),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Text(
+                                                text = "Purges temporary PRoot sockets, fifos, /tmp/* files, and pacman download caches without touching installed software or code.",
+                                                color = currentTheme.fgColor.copy(alpha = 0.75f),
+                                                fontSize = 11.sp
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Button(
+                                                onClick = { cleanTemporaryCaches() },
+                                                colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.CleaningServices,
+                                                    contentDescription = null,
+                                                    tint = currentTheme.fgColor,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = if (lastCleanedMb >= 0) "Cleaned Caches! (Reclaimed ~${lastCleanedMb} MB)" else "Clean Temporary Caches",
+                                                    color = currentTheme.fgColor,
+                                                    fontSize = 12.sp
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.height(20.dp))
+                                            HorizontalDivider(color = currentTheme.fgColor.copy(alpha = 0.15f))
+                                            Spacer(modifier = Modifier.height(14.dp))
+
+                                            Text(
+                                                text = "Factory Reset / Re-bootstrap",
+                                                color = Color(0xFFFF7B72),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = "Wipes the PRoot Linux container and re-extracts the factory Arch Linux ARM image. Useful if pacman packages or runtime get corrupted.",
+                                                color = currentTheme.fgColor.copy(alpha = 0.7f),
+                                                fontSize = 11.sp
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Button(
+                                                onClick = { showResetConfirmDialog = true },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Warning,
+                                                    contentDescription = null,
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text("Re-bootstrap Container (Reset)", color = Color.White, fontSize = 12.sp)
+                                            }
+                                        }
+                                    }
+                                    4 -> {
+                                        // === Tab 4: About & AI Agents ===
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = "ArchDroid",
+                                                color = currentTheme.fgColor,
+                                                fontSize = 20.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                            Text(
+                                                text = "Version 1.0.0 (ARM64 PRoot)",
+                                                color = Color(0xFF1793D1),
+                                                fontSize = 12.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                            Spacer(modifier = Modifier.height(14.dp))
+                                        }
+
+                                        Text(
+                                            text = "Integrated AI Agents:",
+                                            color = Color(0xFF1793D1),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                        val agentList = listOf(
+                                            "agy" to "Antigravity CLI (Google DeepMind agent)",
+                                            "claude" to "Anthropic Claude Code CLI",
+                                            "codex" to "OpenAI Codex CLI (musl static binary)",
+                                            "hermes" to "NousResearch Hermes Agent (uv python)"
+                                        )
+
+                                        if (isWide) {
+                                            val chunkedAgents = agentList.chunked(2)
+                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                chunkedAgents.forEach { rowAgents ->
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        rowAgents.forEach { (cmd, desc) ->
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .weight(1f)
+                                                                    .background(currentTheme.tabInactiveColor, RoundedCornerShape(6.dp))
+                                                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Text(
+                                                                    text = cmd,
+                                                                    color = Color(0xFF7EE787),
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    fontFamily = FontFamily.Monospace,
+                                                                    fontSize = 12.sp
+                                                                )
+                                                                Spacer(modifier = Modifier.width(10.dp))
+                                                                Text(
+                                                                    text = desc,
+                                                                    color = currentTheme.fgColor.copy(alpha = 0.8f),
+                                                                    fontSize = 11.sp,
+                                                                    maxLines = 1,
+                                                                    overflow = TextOverflow.Ellipsis
+                                                                )
+                                                            }
+                                                        }
+                                                        if (rowAgents.size == 1) {
+                                                            Spacer(modifier = Modifier.weight(1f))
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            agentList.forEach { (cmd, desc) ->
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 3.dp)
+                                                        .background(currentTheme.tabInactiveColor, RoundedCornerShape(6.dp))
+                                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = cmd,
+                                                        color = Color(0xFF7EE787),
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontFamily = FontFamily.Monospace,
+                                                        fontSize = 12.sp
+                                                    )
+                                                    Spacer(modifier = Modifier.width(10.dp))
+                                                    Text(
+                                                        text = desc,
                                                         color = currentTheme.fgColor.copy(alpha = 0.8f),
                                                         fontSize = 11.sp
                                                     )
                                                 }
-                                                if (lastCreatedBackupFile != null && lastCreatedBackupFile!!.exists()) {
-                                                    Spacer(modifier = Modifier.height(8.dp))
-                                                    Button(
-                                                        onClick = {
-                                                            try {
-                                                                val shareIntent = BackupManager.createShareIntent(this@MainActivity, lastCreatedBackupFile!!)
-                                                                startActivity(Intent.createChooser(shareIntent, "Share ArchDroid Snapshot"))
-                                                            } catch (_: Throwable) {}
-                                                        },
-                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
-                                                    ) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.Share,
-                                                            contentDescription = null,
-                                                            modifier = Modifier.size(15.dp),
-                                                            tint = Color.White
-                                                        )
-                                                        Spacer(modifier = Modifier.width(6.dp))
-                                                        Text("Share Snapshot", color = Color.White, fontSize = 12.sp)
-                                                    }
-                                                }
                                             }
                                         }
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                    }
 
-                                    Button(
-                                        onClick = { executeCreateBackup() },
-                                        enabled = !backupOpInProgress,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1793D1))
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Backup,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                            tint = Color.White
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Create Full Backup Now", color = Color.White, fontSize = 13.sp)
-                                    }
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Text(
-                                        text = "Restore Snapshot",
-                                        color = Color(0xFF1793D1),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-
-                                    val localBackups = remember(showSettingsDialog) { BackupManager.listLocalBackups() }
-                                    if (localBackups.isNotEmpty()) {
-                                        Text(
-                                            text = "Recent in /sdcard/Download:",
-                                            color = currentTheme.fgColor.copy(alpha = 0.7f),
-                                            fontSize = 11.sp
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        localBackups.take(3).forEach { backupFile ->
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 3.dp)
-                                                    .background(currentTheme.tabInactiveColor, RoundedCornerShape(6.dp))
-                                                    .clickable(enabled = !backupOpInProgress) {
-                                                        restoreTargetFile = backupFile
-                                                        restoreTargetUri = null
-                                                        showRestoreConfirmDialog = true
-                                                    }
-                                                    .padding(horizontal = 10.dp, vertical = 7.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = backupFile.name,
-                                                        color = currentTheme.fgColor,
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Medium,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis,
-                                                        fontFamily = FontFamily.Monospace
-                                                    )
-                                                    Text(
-                                                        text = "${backupFile.length() / (1024 * 1024)} MB • ${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date(backupFile.lastModified()))}",
-                                                        color = currentTheme.fgColor.copy(alpha = 0.6f),
-                                                        fontSize = 10.sp
-                                                    )
-                                                }
-                                                Text(
-                                                    text = "Restore",
-                                                    color = Color(0xFF1793D1),
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 12.sp
-                                                )
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                    }
-
-                                    OutlinedButton(
-                                        onClick = {
-                                            try {
-                                                restorePickerLauncher.launch(arrayOf("*/*"))
-                                            } catch (_: Throwable) {}
-                                        },
-                                        enabled = !backupOpInProgress,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.FolderOpen,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Browse & Import Snapshot File...", fontSize = 12.sp)
-                                    }
-                                }
-                                3 -> {
-                                    // === Tab 3: Storage & Maintenance ===
-                                    Text(
-                                        text = "Rootfs Storage Usage",
-                                        color = Color(0xFF1793D1),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(currentTheme.tabInactiveColor, RoundedCornerShape(8.dp))
-                                            .padding(14.dp)
-                                    ) {
-                                        Column {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Storage,
-                                                        contentDescription = null,
-                                                        tint = Color(0xFF1793D1),
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Text(
-                                                        text = "Container Size",
-                                                        color = currentTheme.fgColor,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        fontSize = 13.sp
-                                                    )
-                                                }
-                                                Text(
-                                                    text = if (rootfsDiskUsageMb > 0) "~${rootfsDiskUsageMb} MB" else "Calculating...",
-                                                    color = Color(0xFF1793D1),
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 14.sp
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.height(6.dp))
-                                            Text(
-                                                text = "Storage used by Arch Linux rootfs, binaries, python/npm libraries, and user files in /root.",
-                                                color = currentTheme.fgColor.copy(alpha = 0.7f),
-                                                fontSize = 11.sp
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Text(
-                                        text = "Clean Temporary Caches",
-                                        color = Color(0xFF1793D1),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(
-                                        text = "Purges temporary PRoot sockets, fifos, /tmp/* files, and pacman download caches without touching installed software or code.",
-                                        color = currentTheme.fgColor.copy(alpha = 0.75f),
-                                        fontSize = 11.sp
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Button(
-                                        onClick = { cleanTemporaryCaches() },
-                                        colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.CleaningServices,
-                                            contentDescription = null,
-                                            tint = currentTheme.fgColor,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = if (lastCleanedMb >= 0) "Cleaned Caches! (Reclaimed ~${lastCleanedMb} MB)" else "Clean Temporary Caches",
-                                            color = currentTheme.fgColor,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(20.dp))
-                                    HorizontalDivider(color = currentTheme.fgColor.copy(alpha = 0.15f))
-                                    Spacer(modifier = Modifier.height(14.dp))
-
-                                    // Factory Reset
-                                    Text(
-                                        text = "Factory Reset / Re-bootstrap",
-                                        color = Color(0xFFFF7B72),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "Wipes the PRoot Linux container and re-extracts the factory Arch Linux ARM image. Useful if pacman packages or runtime get corrupted.",
-                                        color = currentTheme.fgColor.copy(alpha = 0.7f),
-                                        fontSize = 11.sp
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Button(
-                                        onClick = { showResetConfirmDialog = true },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Warning,
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Re-bootstrap Container (Reset)", color = Color.White, fontSize = 12.sp)
-                                    }
-                                }
-                                4 -> {
-                                    // === Tab 4: About & AI Agents ===
-                                    Column(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text(
-                                            text = "ArchDroid",
-                                            color = currentTheme.fgColor,
-                                            fontSize = 20.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        Text(
-                                            text = "Version 1.0.0 (ARM64 PRoot)",
-                                            color = Color(0xFF1793D1),
-                                            fontSize = 12.sp,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        Spacer(modifier = Modifier.height(14.dp))
-                                    }
-
-                                    Text(
-                                        text = "Integrated AI Agents:",
-                                        color = Color(0xFF1793D1),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    listOf(
-                                        "agy" to "Antigravity CLI (Google DeepMind agent)",
-                                        "claude" to "Anthropic Claude Code CLI",
-                                        "codex" to "OpenAI Codex CLI (musl static binary)",
-                                        "hermes" to "NousResearch Hermes Agent (uv python)"
-                                    ).forEach { (cmd, desc) ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 3.dp)
-                                                .background(currentTheme.tabInactiveColor, RoundedCornerShape(6.dp))
-                                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Button(
+                                            onClick = {
+                                                try {
+                                                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/eliakimrosil/ArchDroid")))
+                                                } catch (_: Throwable) {}
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor),
+                                            modifier = Modifier.fillMaxWidth()
                                         ) {
-                                            Text(
-                                                text = cmd,
-                                                color = Color(0xFF7EE787),
-                                                fontWeight = FontWeight.Bold,
-                                                fontFamily = FontFamily.Monospace,
-                                                fontSize = 12.sp
+                                            Icon(
+                                                imageVector = Icons.Default.OpenInBrowser,
+                                                contentDescription = null,
+                                                tint = currentTheme.fgColor,
+                                                modifier = Modifier.size(16.dp)
                                             )
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Text(
-                                                text = desc,
-                                                color = currentTheme.fgColor.copy(alpha = 0.8f),
-                                                fontSize = 11.sp
-                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Open GitHub Repository", color = currentTheme.fgColor, fontSize = 12.sp)
                                         }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Button(
-                                        onClick = {
-                                            try {
-                                                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/eliakimrosil/ArchDroid")))
-                                            } catch (_: Throwable) {}
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabInactiveColor),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.OpenInBrowser,
-                                            contentDescription = null,
-                                            tint = currentTheme.fgColor,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Open GitHub Repository", color = currentTheme.fgColor, fontSize = 12.sp)
                                     }
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.End
