@@ -3389,20 +3389,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            Button(
-                                onClick = { if (!backupOpInProgress) showSettingsDialog = false },
-                                enabled = !backupOpInProgress,
-                                colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabActiveColor)
-                            ) {
-                                Text("Done", color = Color.White)
-                            }
-                        }
                     }
                 }
             }
@@ -3608,30 +3594,16 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = { refreshAutomations() },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Refresh",
-                                    tint = currentTheme.fgColor.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            IconButton(
-                                onClick = { showAutomationsDialog = false },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Close",
-                                    tint = currentTheme.fgColor.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                        IconButton(
+                            onClick = { showAutomationsDialog = false },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = currentTheme.fgColor.copy(alpha = 0.7f),
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
 
@@ -3721,20 +3693,6 @@ class MainActivity : ComponentActivity() {
                             items(automationsList) { item ->
                                 AutomationCard(item)
                             }
-                        }
-                    }
-
-                    // Footer with Done button
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        Button(
-                            onClick = { showAutomationsDialog = false },
-                            colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabActiveColor)
-                        ) {
-                            Text("Done", color = Color.White)
                         }
                     }
                 }
@@ -3980,34 +3938,16 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = {
-                                    selectedLogJobId?.let {
-                                        currentLogContent = ArchDroidAutomationManager.readRecentLogs(this@MainActivity, it, selectedLogScript)
-                                    }
-                                },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Refresh Log",
-                                    tint = currentTheme.fgColor.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            IconButton(
-                                onClick = { showLogDialog = false },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Close",
-                                    tint = currentTheme.fgColor.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
+                        IconButton(
+                            onClick = { showLogDialog = false },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = currentTheme.fgColor.copy(alpha = 0.7f),
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
 
@@ -4045,12 +3985,30 @@ class MainActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Action Buttons: Copy Logs & Done
+                    // Action Buttons: Refresh & Copy Logs
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.End,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        OutlinedButton(
+                            onClick = {
+                                selectedLogJobId?.let {
+                                    currentLogContent = ArchDroidAutomationManager.readRecentLogs(this@MainActivity, it, selectedLogScript)
+                                }
+                            },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF58A6FF)),
+                            border = BorderStroke(0.8.dp, Color(0xFF58A6FF).copy(alpha = 0.4f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Refresh", fontSize = 12.sp)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = {
                                 val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -4067,13 +4025,6 @@ class MainActivity : ComponentActivity() {
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Copy Logs", fontSize = 12.sp, color = Color.White)
-                        }
-
-                        Button(
-                            onClick = { showLogDialog = false },
-                            colors = ButtonDefaults.buttonColors(containerColor = currentTheme.tabActiveColor)
-                        ) {
-                            Text("Done", color = Color.White)
                         }
                     }
                 }
